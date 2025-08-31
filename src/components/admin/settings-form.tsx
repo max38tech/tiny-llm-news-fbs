@@ -49,7 +49,7 @@ export function SettingsForm() {
     },
   });
 
-  function onSubmit(data: z.infer<typeof settingsSchema>) {
+  const onSubmit = (data: z.infer<typeof settingsSchema>) => {
     toast({
       title: 'Settings Saved!',
       description: 'Your new settings have been applied.',
@@ -57,7 +57,7 @@ export function SettingsForm() {
     console.log(data);
   }
   
-  function onServiceToggle(action: 'start' | 'pause') {
+  const onServiceToggle = (action: 'start' | 'pause') => {
     toast({
       title: `Service ${action === 'start' ? 'Started' : 'Paused'}`,
       description: `The AI scraping service has been ${action === 'start' ? 'restarted' : 'paused'}.`,
