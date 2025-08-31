@@ -3,25 +3,34 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { auth, provider, signInWithPopup, onAuthStateChanged } from '@/lib/firebase';
+import { auth, provider, signInWithRedirect, getRedirectResult } from '@/lib/firebase';
 import { BotMessageSquare, Chrome } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.push('/admin');
-      }
-    });
-    return () => unsubscribe();
-  }, [router]);
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          router.push('/admin');
+        }
+      })
+      .catch((error) => {
+        console.error('Error getting redirect result: ', error);
+        toast({
+          title: 'Authentication Failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      });
+  }, [router, toast]);
 
   const handleSignIn = async () => {
     try {
-      await signInWithPopup(auth, provider);
-      router.push('/admin');
+      await signInWithRedirect(auth, provider);
     } catch (error) {
       console.error('Error signing in with Google: ', error);
     }
