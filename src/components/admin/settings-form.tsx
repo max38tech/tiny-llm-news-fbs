@@ -55,14 +55,14 @@ export function SettingsForm() {
       description: 'Your new settings have been applied.',
     });
     console.log(data);
-  }
+  };
   
   const onServiceToggle = (action: 'start' | 'pause') => {
     toast({
       title: `Service ${action === 'start' ? 'Started' : 'Paused'}`,
       description: `The AI scraping service has been ${action === 'start' ? 'restarted' : 'paused'}.`,
     });
-  }
+  };
 
   return (
     <div className="grid gap-8 md:grid-cols-3">
