@@ -35,7 +35,9 @@ const prompt = ai.definePrompt({
   output: {schema: SummarizeArticleOutputSchema},
   prompt: `You are an AI expert in summarizing technical blog posts and news articles related to running small LLMs on limited resources.
 
-  Summarize the following article content, extracting the key information and insights related to small LLMs.  Include the original article URL and a featured image if available, otherwise generate one.
+  Summarize the following article content, extracting the key information and insights related to small LLMs. The summary should be detailed and take an average reader about 1 minute to read (around 200-250 words).
+  
+  Include the original article URL and a featured image if available, otherwise generate one.
 
   Article Content: {{{articleContent}}}
   Original Article URL: {{{articleUrl}}}
