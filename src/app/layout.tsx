@@ -11,9 +11,12 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
+  SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
+import { AuthButton } from '@/components/auth-button';
+
 
 export const metadata: Metadata = {
   title: 'LLM Daily Digest',
@@ -74,6 +77,9 @@ export default function RootLayout({
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarContent>
+            <SidebarFooter>
+                <AuthButton />
+            </SidebarFooter>
           </Sidebar>
           <SidebarInset>{children}</SidebarInset>
         </SidebarProvider>
