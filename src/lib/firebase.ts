@@ -2,7 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
+  apiKey: "AIzaSyCsJQPa8sh2Ab0qpmTgdxrCKBy2lO0n_B0",
   authDomain: "llm-daily-digest.firebaseapp.com",
   projectId: "llm-daily-digest",
   storageBucket: "llm-daily-digest.appspot.com",
