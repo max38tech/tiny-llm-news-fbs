@@ -45,22 +45,24 @@ export default function LoginPage() {
   }, [router]);
 
   const handleSignIn = async () => {
-    setLoading(true);
+    // Don't set loading to true here, as it can cause a re-render that closes the popup.
     try {
       await signInWithPopup(auth, provider);
       // The onAuthStateChanged listener will handle the redirect.
+      // We can show a toast here, but the primary redirect logic is in the listener.
       toast({
         title: 'Signed In',
-        description: 'Successfully authenticated.',
+        description: 'Successfully authenticated. Redirecting...',
       });
     } catch (error: any) {
-      console.error('Error signing in with Google: ', error);
-      toast({
-        title: 'Authentication Failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-      setLoading(false);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        console.error('Error signing in with Google: ', error);
+        toast({
+          title: 'Authentication Failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     }
   };
   

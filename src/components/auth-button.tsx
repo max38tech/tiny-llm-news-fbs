@@ -7,11 +7,14 @@ import { Button } from './ui/button';
 import { LogIn, LogOut } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 export function AuthButton() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { toast } = useToast();
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -25,8 +28,15 @@ export function AuthButton() {
     try {
       await signInWithPopup(auth, provider);
       // onAuthStateChanged will handle the UI update
-    } catch (error) {
-      console.error('Error signing in with Google: ', error);
+    } catch (error: any) {
+      if (error.code !== 'auth/popup-closed-by-user') {
+        console.error('Error signing in with Google: ', error);
+        toast({
+            title: 'Authentication Failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+      }
     }
   };
 
@@ -34,8 +44,13 @@ export function AuthButton() {
     try {
       await auth.signOut();
       router.push('/');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing out: ', error);
+      toast({
+        title: 'Sign Out Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   };
   
