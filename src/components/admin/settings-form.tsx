@@ -102,7 +102,7 @@ export function SettingsForm() {
                                 <FormControl>
                                     <SelectTrigger>
                                     <SelectValue placeholder="Select frequency" />
-                                    </Trigger>
+                                    </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
                                     <SelectItem value="1">Once daily</SelectItem>
