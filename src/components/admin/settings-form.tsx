@@ -148,7 +148,7 @@ export function SettingsForm() {
                  <p className="text-sm text-muted-foreground">
                     Use these controls to pause or resume the automatic fetching and posting of articles.
                 </p>
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={() => onServiceToggle('start')}>
                         <Play className="mr-2 h-4 w-4" />
                         Start / Resume
