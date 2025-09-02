@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { auth, provider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from '@/lib/firebase';
+import { auth, provider, signInWithPopup, onAuthStateChanged, User } from '@/lib/firebase';
 import { BotMessageSquare, Chrome } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,46 +14,35 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // First, check if the user is already signed in.
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         router.push('/admin');
-        return;
+      } else {
+        setLoading(false);
       }
-      // If no user, then check for redirect result.
-      getRedirectResult(auth)
-        .then((result) => {
-          if (result) {
-            // This will trigger the onAuthStateChanged listener above
-            // and redirect to /admin.
-            toast({
-                title: 'Signed In',
-                description: 'Successfully authenticated.',
-            });
-          }
-          setLoading(false); // Done checking, show the page.
-        })
-        .catch((error) => {
-          console.error('Error getting redirect result: ', error);
-          toast({
-            title: 'Authentication Failed',
-            description: error.message,
-            variant: 'destructive',
-          });
-          setLoading(false);
-        });
     });
-    
-    return () => unsubscribe();
 
-  }, [router, toast]);
+    return () => unsubscribe();
+  }, [router]);
 
   const handleSignIn = async () => {
     setLoading(true);
     try {
-      await signInWithRedirect(auth, provider);
-    } catch (error) {
+      const result = await signInWithPopup(auth, provider);
+      if (result.user) {
+        toast({
+          title: 'Signed In',
+          description: 'Successfully authenticated.',
+        });
+        // The onAuthStateChanged listener will handle the redirect.
+      }
+    } catch (error: any) {
       console.error('Error signing in with Google: ', error);
+      toast({
+        title: 'Authentication Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
       setLoading(false);
     }
   };
@@ -74,7 +63,6 @@ export default function LoginPage() {
         </div>
     )
   }
-
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
