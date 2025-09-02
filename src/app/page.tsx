@@ -1,4 +1,4 @@
-import { getArticles } from '@/lib/mock-data';
+import { getArticles } from '@/lib/articles';
 import { ArticleCard } from '@/components/article-card';
 
 export default async function Home() {

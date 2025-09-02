@@ -1,6 +1,6 @@
 'use client';
 
-import type { Article } from '@/lib/mock-data';
+import type { Article } from '@/lib/articles';
 import {
   Table,
   TableHeader,

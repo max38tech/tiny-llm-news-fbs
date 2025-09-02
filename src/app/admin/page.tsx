@@ -1,7 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SettingsForm } from "@/components/admin/settings-form";
 import { PostsTable } from "@/components/admin/posts-table";
-import { getArticles } from "@/lib/mock-data";
+import { getArticles } from "@/lib/articles";
 import AuthGuard from "@/components/admin/auth-guard";
 
 export default async function AdminPage() {
