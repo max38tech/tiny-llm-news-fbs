@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { auth, provider, signInWithPopup, onAuthStateChanged, getRedirectResult, User } from '@/lib/firebase';
+import { auth, provider, signInWithPopup, onAuthStateChanged, User } from '@/lib/firebase';
 import { Chrome } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,44 +30,26 @@ function Logo() {
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        setUser(user);
         router.push('/admin');
       } else {
-        // This handles both the initial state and sign-out
-        setUser(null);
         setLoading(false);
       }
     });
 
-    // Check for redirect result as a fallback.
-    getRedirectResult(auth)
-      .catch((error) => {
-          // This can happen if there's no redirect result, which is normal.
-          // We only want to log more serious errors.
-          if (error.code !== 'auth/no-redirect-result') {
-            console.error('Error getting redirect result: ', error);
-            toast({
-                title: 'Authentication Failed',
-                description: error.message,
-                variant: 'destructive',
-            });
-          }
-      });
-
     return () => unsubscribe();
-  }, [router, toast]);
+  }, [router]);
 
   const handleSignIn = async () => {
     try {
       await signInWithPopup(auth, provider);
       // The onAuthStateChanged listener will handle the redirect.
     } catch (error: any) {
+      // Don't show an error if the user intentionally closes the popup.
       if (error.code !== 'auth/popup-closed-by-user') {
         console.error('Error signing in with Google: ', error);
         toast({
@@ -94,11 +76,6 @@ export default function LoginPage() {
             </div>
         </div>
     )
-  }
-
-  // Don't render the sign-in page if we are about to redirect
-  if (user) {
-    return null;
   }
 
   return (
