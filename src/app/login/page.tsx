@@ -4,9 +4,28 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { auth, provider, signInWithPopup, onAuthStateChanged, User } from '@/lib/firebase';
-import { BotMessageSquare, Chrome } from 'lucide-react';
+import { Chrome } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+
+function Logo() {
+    return (
+      <div className="flex items-center justify-center -mr-2">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-10 w-10 text-primary"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+      </div>
+    );
+  }
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,14 +47,12 @@ export default function LoginPage() {
   const handleSignIn = async () => {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, provider);
-      if (result.user) {
-        toast({
-          title: 'Signed In',
-          description: 'Successfully authenticated.',
-        });
-        // The onAuthStateChanged listener will handle the redirect.
-      }
+      await signInWithPopup(auth, provider);
+      // The onAuthStateChanged listener will handle the redirect.
+      toast({
+        title: 'Signed In',
+        description: 'Successfully authenticated.',
+      });
     } catch (error: any) {
       console.error('Error signing in with Google: ', error);
       toast({
@@ -52,7 +69,7 @@ export default function LoginPage() {
         <div className="flex min-h-screen flex-col items-center justify-center bg-background">
              <div className="mx-auto flex w-full max-w-sm flex-col items-center justify-center space-y-6">
                 <div className="flex items-center gap-2 text-2xl font-semibold">
-                    <BotMessageSquare className="h-10 w-10 text-primary" />
+                    <Logo />
                     <h1>LLM Daily Digest</h1>
                 </div>
                 <div className="w-full rounded-lg border p-6 shadow-lg space-y-4">
@@ -68,7 +85,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
       <div className="mx-auto flex w-full max-w-sm flex-col items-center justify-center space-y-6">
         <div className="flex items-center gap-2 text-2xl font-semibold">
-          <BotMessageSquare className="h-10 w-10 text-primary" />
+          <Logo />
           <h1>LLM Daily Digest</h1>
         </div>
         <div className="w-full rounded-lg border p-6 shadow-lg">

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Home, Shield, BotMessageSquare } from 'lucide-react';
+import { Home, Shield } from 'lucide-react';
 import './globals.css';
 import {
   SidebarProvider,
@@ -17,7 +17,6 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { AuthButton } from '@/components/auth-button';
 
-
 export const metadata: Metadata = {
   title: 'LLM Daily Digest',
   description: 'AI-curated news on Tiny LLMs',
@@ -26,7 +25,18 @@ export const metadata: Metadata = {
 function Logo() {
   return (
     <div className="flex items-center justify-center -mr-2">
-      <BotMessageSquare className="h-8 w-8 text-primary" />
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-8 w-8 text-primary"
+      >
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+      </svg>
     </div>
   );
 }
