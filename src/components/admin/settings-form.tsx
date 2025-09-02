@@ -24,7 +24,11 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, Loader2 } from 'lucide-react';
+import { runArticlePipeline } from '@/ai/flows/run-article-pipeline';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
 
 const settingsSchema = z.object({
   sources: z.string().min(10, 'Please provide at least one URL.'),
@@ -40,6 +44,9 @@ const defaultSources = [
 
 export function SettingsForm() {
   const { toast } = useToast();
+  const router = useRouter();
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
@@ -57,10 +64,55 @@ export function SettingsForm() {
     console.log(data);
   };
   
-  const onServiceToggle = (action: 'start' | 'pause') => {
+  const handleRunPipeline = async () => {
+    setIsProcessing(true);
     toast({
-      title: `Service ${action === 'start' ? 'Started' : 'Paused'}`,
-      description: `The AI scraping service has been ${action === 'start' ? 'restarted' : 'paused'}.`,
+      title: 'Starting AI Pipeline',
+      description: 'Finding and processing articles. This may take a moment...',
+    });
+
+    try {
+      // For now, we'll just run the pipeline on the first source URL.
+      // A full implementation would run this on a schedule for all sources.
+      const sources = form.getValues('sources').split('\n');
+      const sourceUrl = sources[0];
+
+      if (!sourceUrl) {
+        toast({
+          title: 'Error',
+          description: 'Please provide at least one source URL.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const result = await runArticlePipeline({ sourceUrl });
+      
+      toast({
+        title: 'Pipeline Complete!',
+        description: `${result.articlesAdded} new articles were added.`,
+      });
+
+      // Refresh the page to see the new posts
+      router.refresh();
+
+    } catch (error) {
+      console.error('Pipeline failed:', error);
+      toast({
+        title: 'Pipeline Failed',
+        description: 'Something went wrong while processing articles.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+
+  const onServiceToggle = (action: 'pause') => {
+    toast({
+      title: `Service Paused`,
+      description: `The AI scraping service has been paused.`,
     });
   };
 
@@ -146,12 +198,16 @@ export function SettingsForm() {
             </CardHeader>
             <CardContent className="flex flex-col space-y-4">
                  <p className="text-sm text-muted-foreground">
-                    Use these controls to pause or resume the automatic fetching and posting of articles.
+                    Use these controls to manually run, pause, or resume the automatic fetching and posting of articles.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={() => onServiceToggle('start')}>
-                        <Play className="mr-2 h-4 w-4" />
-                        Start / Resume
+                    <Button variant="outline" onClick={handleRunPipeline} disabled={isProcessing}>
+                        {isProcessing ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Play className="mr-2 h-4 w-4" />
+                        )}
+                        {isProcessing ? 'Processing...' : 'Start / Run Now'}
                     </Button>
                     <Button variant="destructive" onClick={() => onServiceToggle('pause')}>
                         <Pause className="mr-2 h-4 w-4" />
