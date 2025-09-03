@@ -37,7 +37,7 @@ const findArticleLinksPrompt = ai.definePrompt({
 Content:
 {{{content}}}
     
-Your response MUST be only the raw JSON in the specified format. Do not include markdown, any conversational text, or any other explanations.`,
+CRITICAL: Your response must contain ONLY the raw JSON object, without any markdown, conversational text, or other characters. Do not include 'json' or '\`\`\`' in your response.`,
 });
 
 
