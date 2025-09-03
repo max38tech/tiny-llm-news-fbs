@@ -32,13 +32,14 @@ export async function runArticlePipeline(input: ArticlePipelineInput): Promise<A
 
 const findArticleLinksPrompt = ai.definePrompt({
     name: 'findArticleLinksPrompt',
-    input: { schema: z.object({ content: z.string(), sourceUrl: z.string().url() }) },
-    // We will parse the output manually now, so we expect a string.
-    output: { format: 'text' },
-    prompt: `Based on the following content from {{sourceUrl}}, extract up to 5 of the most prominent articles, providing both the title and the full URL.
-    
-Content:
-{{{content}}}
+    input: { schema: z.object({ linkData: z.string(), sourceUrl: z.string().url() }) },
+    output: { format: 'json', schema: z.object({ articles: z.array(FoundArticleSchema) }) },
+    prompt: `You are an expert at identifying primary news articles from a raw list of hyperlinks. 
+Based on the following hyperlink data from {{sourceUrl}}, extract up to 5 of the most prominent articles.
+A prominent article will have a descriptive title and a URL that looks like a direct link to a story, not a category or author page.
+
+Link Data:
+{{{linkData}}}
     
 CRITICAL: Your response must contain ONLY the raw JSON object, without any markdown, conversational text, or other characters. Do not include 'json' or \`\`\` in your response.`,
 });
@@ -52,43 +53,22 @@ const articlePipelineFlow = ai.defineFlow(
     outputSchema: ArticlePipelineOutputSchema,
   },
   async (input) => {
-    // 1. Scrape the source URL to find article links
-    const pageContent = await scrapeUrl(input.sourceUrl);
-    const { output } = await findArticleLinksPrompt({ content: pageContent, sourceUrl: input.sourceUrl });
-
-    if (!output) {
-      return { message: 'No new articles found.', foundArticles: [] };
-    }
+    // 1. Scrape the source URL to get a list of links
+    const linkData = await scrapeUrl(input.sourceUrl);
     
-    // 2. Find and parse the JSON from the potentially messy output string
-    let articles: FoundArticle[] = [];
-    try {
-      // Find the start and end of the JSON object in the string
-      const jsonStart = output.indexOf('{');
-      const jsonEnd = output.lastIndexOf('}');
-      
-      if (jsonStart === -1 || jsonEnd === -1) {
-        throw new Error('No JSON object found in the AI response.');
-      }
-      
-      const jsonString = output.substring(jsonStart, jsonEnd + 1);
-      const parsed = ArticleLinksSchema.parse(JSON.parse(jsonString));
-      articles = parsed.articles;
-
-    } catch (error) {
-      console.error("Failed to parse articles from AI response:", error);
-      console.error("Original AI output:", output);
-      // We can still continue with an empty list if parsing fails
-      articles = [];
+    if (!linkData) {
+        return { message: 'Could not retrieve content from the source URL.', foundArticles: [] };
     }
 
-    if (articles.length === 0) {
+    const { output } = await findArticleLinksPrompt({ linkData, sourceUrl: input.sourceUrl });
+
+    if (!output || !output.articles || output.articles.length === 0) {
         return { message: 'No new articles found.', foundArticles: [] };
     }
     
     return {
-        message: `Pipeline completed. Found ${articles.length} articles.`,
-        foundArticles: articles,
+        message: `Pipeline completed. Found ${output.articles.length} articles.`,
+        foundArticles: output.articles,
     };
   }
 );

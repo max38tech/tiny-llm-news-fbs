@@ -21,10 +21,16 @@ export async function scrapeUrl(url: string): Promise<string> {
         // Wait for a few seconds to ensure all dynamic content is loaded
         await new Promise(r => setTimeout(r, 3000));
         
-        // Extract the text content of the page
-        const textContent = await page.evaluate(() => document.body.innerText);
+        // Extract all links and their text content
+        const links = await page.evaluate(() => {
+            return Array.from(document.querySelectorAll('a'))
+                .map(anchor => ({ href: anchor.href, text: anchor.innerText.trim() }))
+                .filter(link => link.text && link.href);
+        });
+
+        // Format the links as a string for the AI prompt
+        return links.map(link => `Link: ${link.href}\nText: ${link.text}`).join('\n\n');
         
-        return textContent;
     } catch (error) {
         console.error(`Error scraping ${url}:`, error);
         return ''; // Return empty string on failure
