@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,9 +30,11 @@ import { runArticlePipeline, ArticlePipelineOutput } from '@/ai/flows/run-articl
 import { summarizeArticle } from '@/ai/flows/summarize-articles';
 import { generateArticleImage } from '@/ai/flows/generate-article-image';
 import { addArticle } from '@/lib/firebase/service';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSettings, saveSettings } from '@/lib/firebase/service';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 
 const settingsSchema = z.object({
@@ -54,8 +57,9 @@ export function SettingsForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingStatus, setProcessingStatus] = useState('');
+  const [processingLog, setProcessingLog] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
@@ -65,6 +69,12 @@ export function SettingsForm() {
       maxPosts: 3,
     },
   });
+  
+  useEffect(() => {
+    if (logContainerRef.current) {
+        logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [processingLog]);
 
   useEffect(() => {
     async function loadSettings() {
@@ -88,6 +98,10 @@ export function SettingsForm() {
     loadSettings();
   }, [form, toast]);
 
+  const addLogMessage = (message: string) => {
+    setProcessingLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+  };
+
   const onSubmit = async (data: z.infer<typeof settingsSchema>) => {
     try {
         await saveSettings(data);
@@ -107,42 +121,41 @@ export function SettingsForm() {
   
   const processArticle = async (article: FoundArticle) => {
     try {
-        setProcessingStatus(`Summarizing: ${article.title}`);
+        addLogMessage(`Summarizing: ${article.title}`);
         const summaryOutput = await summarizeArticle({ articleUrl: article.link });
 
         let finalImage = summaryOutput.featuredImage;
 
         if (!finalImage) {
-            setProcessingStatus(`Generating image for: ${article.title}`);
+            addLogMessage(`Generating image for: ${article.title}`);
             const imageOutput = await generateArticleImage({ articleDescription: `${summaryOutput.title} - ${summaryOutput.summary}` });
             finalImage = imageOutput.imageUrl;
         }
         
-        setProcessingStatus(`Saving: ${article.title}`);
+        addLogMessage(`Saving to database: ${article.title}`);
         await addArticle({
           ...summaryOutput,
           featuredImage: finalImage,
         });
+        addLogMessage(`Successfully saved: ${article.title}`);
 
     } catch (error) {
-        console.error(`Error processing article ${article.link}:`, error);
-        // We can show a toast here if we want to notify about individual failures
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addLogMessage(`ERROR processing article ${article.link}: ${errorMessage}`);
     }
   };
 
   const handleRunPipeline = async () => {
     setIsProcessing(true);
-    setProcessingStatus('Finding articles...');
-    toast({
-      title: 'Starting AI Pipeline',
-      description: 'Finding articles. This may take a moment...',
-    });
+    setProcessingLog([]);
+    addLogMessage('Starting AI Pipeline...');
 
     try {
-      const sources = form.getValues('sources').split('\n');
+      const sources = form.getValues('sources').split('\n').filter(s => s.trim() !== '');
       const sourceUrl = sources[0];
 
       if (!sourceUrl) {
+        addLogMessage('ERROR: No source URL provided.');
         toast({
           title: 'Error',
           description: 'Please provide at least one source URL.',
@@ -152,22 +165,21 @@ export function SettingsForm() {
         return;
       }
 
+      addLogMessage(`Scraping source: ${sourceUrl}`);
       const result = await runArticlePipeline({ sourceUrl });
       
       if (!result.foundArticles || result.foundArticles.length === 0) {
+        addLogMessage(result.message || 'The scraper could not find any new article links on the source page.');
         toast({
-          title: 'Pipeline Complete!',
-          description: "The scraper couldn't find any new article links on the source page.",
-          duration: 9000,
+          title: 'Pipeline Complete',
+          description: result.message || "Couldn't find any new article links.",
         });
         setIsProcessing(false);
         return;
       }
 
-      toast({
-        title: 'Articles Found!',
-        description: `Now processing ${result.foundArticles.length} articles. This may take a few minutes.`,
-      });
+      addLogMessage(`Found ${result.foundArticles.length} potential articles.`);
+      addLogMessage(`Beginning processing of articles. This may take a few minutes...`);
 
       let articlesAdded = 0;
       for (const article of result.foundArticles) {
@@ -175,27 +187,29 @@ export function SettingsForm() {
         articlesAdded++;
       }
       
-      setProcessingStatus('');
+      addLogMessage(`Pipeline complete. ${articlesAdded} articles processed.`);
       toast({
         title: 'Pipeline Complete!',
-        description: `${articlesAdded} new articles were added.`,
+        description: `${articlesAdded} new articles were processed. Check the log for details.`,
         duration: 9000,
       });
 
       if (articlesAdded > 0) {
+        addLogMessage('Refreshing page data...');
         router.refresh();
       }
 
     } catch (error) {
-      console.error('Pipeline failed:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      addLogMessage(`PIPELINE FAILED: ${errorMessage}`);
       toast({
         title: 'Pipeline Failed',
-        description: (error as Error).message || 'Something went wrong while finding articles.',
+        description: 'An unexpected error occurred. Check the log for details.',
         variant: 'destructive',
       });
     } finally {
       setIsProcessing(false);
-      setProcessingStatus('');
+      addLogMessage('Process finished.');
     }
   };
 
@@ -207,7 +221,7 @@ export function SettingsForm() {
     });
   };
 
-  const buttonText = isProcessing ? processingStatus || 'Processing...' : 'Start / Run Now';
+  const buttonText = isProcessing ? 'Processing...' : 'Start / Run Now';
 
   return (
     <Form {...form}>
@@ -257,7 +271,7 @@ export function SettingsForm() {
                                 <Textarea rows={5} placeholder="Enter one URL per line" {...field} />
                             </FormControl>
                             <FormDescription>
-                                The AI will scrape these URLs for relevant articles.
+                                The AI will scrape these URLs for relevant articles. The pipeline only uses the first URL.
                             </FormDescription>
                             <FormMessage />
                             </FormItem>
@@ -336,6 +350,26 @@ export function SettingsForm() {
                     </div>
                 </CardContent>
             </Card>
+
+            {processingLog.length > 0 && (
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Pipeline Log</CardTitle>
+                        <CardDescription>Real-time log of the AI pipeline process.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <ScrollArea className="h-64 w-full">
+                            <div ref={logContainerRef} className="p-4 bg-muted/50 rounded-lg text-xs font-mono space-y-1">
+                                {processingLog.map((log, index) => (
+                                    <p key={index} className={cn(
+                                        {'text-destructive': log.includes('ERROR') || log.includes('FAILED')}
+                                    )}>{log}</p>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </CardContent>
+                 </Card>
+            )}
         </div>
       </div>
     </Form>
