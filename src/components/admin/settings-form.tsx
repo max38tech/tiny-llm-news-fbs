@@ -26,8 +26,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Play, Pause, Loader2 } from 'lucide-react';
 import { runArticlePipeline } from '@/ai/flows/run-article-pipeline';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getSettings, saveSettings } from '@/lib/firebase/service';
 
 
 const settingsSchema = z.object({
@@ -35,6 +36,8 @@ const settingsSchema = z.object({
   frequency: z.string(),
   maxPosts: z.coerce.number().min(1, 'Must be at least 1.').max(10, 'Cannot exceed 10.'),
 });
+
+export type SettingsData = z.infer<typeof settingsSchema>;
 
 const defaultSources = [
   'https://huggingface.co/papers',
@@ -46,6 +49,7 @@ export function SettingsForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
@@ -56,12 +60,33 @@ export function SettingsForm() {
     },
   });
 
-  const onSubmit = (data: z.infer<typeof settingsSchema>) => {
-    toast({
-      title: 'Settings Saved!',
-      description: 'Your new settings have been applied.',
-    });
-    console.log(data);
+  useEffect(() => {
+    async function loadSettings() {
+      setIsLoading(true);
+      const settings = await getSettings();
+      if (settings) {
+        form.reset(settings);
+      }
+      setIsLoading(false);
+    }
+    loadSettings();
+  }, [form]);
+
+  const onSubmit = async (data: z.infer<typeof settingsSchema>) => {
+    try {
+        await saveSettings(data);
+        toast({
+          title: 'Settings Saved!',
+          description: 'Your new settings have been applied.',
+        });
+    } catch (error) {
+        console.error('Failed to save settings:', error);
+        toast({
+            title: 'Error',
+            description: 'Failed to save settings.',
+            variant: 'destructive',
+        });
+    }
   };
   
   const handleRunPipeline = async () => {
@@ -115,6 +140,38 @@ export function SettingsForm() {
       description: `The AI scraping service has been paused.`,
     });
   };
+
+  if (isLoading) {
+    return (
+        <div className="grid gap-8 md:grid-cols-3">
+            <div className="md:col-span-2 space-y-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Content Scraping</CardTitle>
+                        <CardDescription>Configure where and how the AI finds content.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="space-y-2">
+                            <FormLabel>URL Sources</FormLabel>
+                            <div className="h-[9.5rem] w-full animate-pulse rounded-md bg-muted"></div>
+                        </div>
+                        <div className="grid gap-6 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <FormLabel>Scraping Frequency</FormLabel>
+                                <div className="h-10 w-full animate-pulse rounded-md bg-muted"></div>
+                            </div>
+                            <div className="space-y-2">
+                                <FormLabel>Max Posts per Run</FormLabel>
+                                <div className="h-10 w-full animate-pulse rounded-md bg-muted"></div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <div className="h-10 w-28 animate-pulse rounded-md bg-muted"></div>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="grid gap-8 md:grid-cols-3">

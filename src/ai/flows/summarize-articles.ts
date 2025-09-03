@@ -33,9 +33,9 @@ const prompt = ai.definePrompt({
   name: 'summarizeArticlePrompt',
   input: {schema: z.object({ articleContent: z.string(), articleUrl: z.string() })},
   output: {schema: SummarizeArticleOutputSchema},
-  prompt: `You are an AI expert in summarizing technical blog posts and news articles related to running small LLMs on limited resources.
+  prompt: `You are an AI expert in summarizing blog posts and news articles.
 
-  Summarize the following article content, extracting the key information and insights related to small LLMs. The summary should be detailed and take an average reader about 1 minute to read (around 200-250 words). Provide a suitable title for the article.
+  Summarize the following article content. The summary should be detailed and take an average reader about 1 minute to read (around 200-250 words). Provide a suitable title for the article.
   
   Return the original article URL and a featured image if one is available in the content.
 
