@@ -34,10 +34,10 @@ const findArticleLinksPrompt = ai.definePrompt({
     output: { schema: z.object({ articles: z.array(z.object({ title: z.string(), link: z.string().url()})) }) },
     prompt: `Based on the following content from {{sourceUrl}}, extract up to 5 of the most prominent articles, providing both the title and the full URL.
     
-    Content:
-    {{{content}}}
+Content:
+{{{content}}}
     
-    Return only the data in the specified JSON format. Do not include any other text or explanations.`,
+Your response MUST be only the raw JSON in the specified format. Do not include markdown, any conversational text, or any other explanations.`,
 });
 
 
