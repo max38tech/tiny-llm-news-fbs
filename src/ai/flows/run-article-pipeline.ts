@@ -1,26 +1,26 @@
 'use server';
 /**
- * @fileOverview This flow orchestrates the entire process of finding,
- * summarizing, and generating images for articles, and then storing them.
+ * @fileOverview This flow orchestrates finding articles from a source URL.
+ * It no longer processes them, returning the found links to the client.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { summarizeArticle } from './summarize-articles';
-import { generateArticleImage } from './generate-article-image';
 import { scrapeUrl } from '@/services/scraper';
-import { addArticle } from '@/lib/firebase/service';
 
 const ArticlePipelineInputSchema = z.object({
   sourceUrl: z.string().url().describe('The URL of the source to find articles from (e.g., a news site or blog).'),
 });
 export type ArticlePipelineInput = z.infer<typeof ArticlePipelineInputSchema>;
 
-// The pipeline output is now a confirmation message.
+const FoundArticleSchema = z.object({
+    title: z.string(),
+    link: z.string().url(),
+});
+
 const ArticlePipelineOutputSchema = z.object({
     message: z.string(),
-    articlesAdded: z.number(),
-    foundTitles: z.array(z.string()),
+    foundArticles: z.array(FoundArticleSchema),
 });
 export type ArticlePipelineOutput = z.infer<typeof ArticlePipelineOutputSchema>;
 
@@ -37,7 +37,7 @@ const findArticleLinksPrompt = ai.definePrompt({
 Content:
 {{{content}}}
     
-CRITICAL: Your response must contain ONLY the raw JSON object, without any markdown, conversational text, or other characters. Do not include 'json' or '\`\`\`' in your response.`,
+CRITICAL: Your response must contain ONLY the raw JSON object, without any markdown, conversational text, or other characters. Do not include 'json' or \`\`\` in your response.`,
 });
 
 
@@ -53,44 +53,12 @@ const articlePipelineFlow = ai.defineFlow(
     const { output } = await findArticleLinksPrompt({ content: pageContent, sourceUrl: input.sourceUrl });
 
     if (!output || !output.articles || output.articles.length === 0) {
-        console.log('No article links found.');
-        return { message: 'No new articles found.', articlesAdded: 0, foundTitles: [] };
+        return { message: 'No new articles found.', foundArticles: [] };
     }
     
-    const foundTitles = output.articles.map(a => a.title);
-    let articlesAdded = 0;
-    // 2. For each link, run the summarization and image generation flows in parallel
-    const processingPromises = output.articles.map(async (article) => {
-      try {
-        // Summarize the article
-        const summaryOutput = await summarizeArticle({ articleUrl: article.link });
-
-        let finalImage = summaryOutput.featuredImage;
-
-        // If no featured image, generate one
-        if (!finalImage) {
-            const imageOutput = await generateArticleImage({ articleDescription: `${summaryOutput.title} - ${summaryOutput.summary}` });
-            finalImage = imageOutput.imageUrl;
-        }
-
-        // 3. Store the processed article in Firestore
-        await addArticle({
-          ...summaryOutput,
-          featuredImage: finalImage,
-        });
-        articlesAdded++;
-
-      } catch (error) {
-          console.error(`Error processing article ${article.link}:`, error);
-      }
-    });
-
-    await Promise.all(processingPromises);
-    
     return {
-        message: `Pipeline completed. Added ${articlesAdded} new articles.`,
-        articlesAdded,
-        foundTitles,
+        message: `Pipeline completed. Found ${output.articles.length} articles.`,
+        foundArticles: output.articles,
     };
   }
 );

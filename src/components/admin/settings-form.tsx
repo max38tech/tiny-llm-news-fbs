@@ -25,7 +25,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Play, Pause, Loader2 } from 'lucide-react';
-import { runArticlePipeline } from '@/ai/flows/run-article-pipeline';
+import { runArticlePipeline, ArticlePipelineOutput } from '@/ai/flows/run-article-pipeline';
+import { summarizeArticle } from '@/ai/flows/summarize-articles';
+import { generateArticleImage } from '@/ai/flows/generate-article-image';
+import { addArticle } from '@/lib/firebase/service';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSettings, saveSettings } from '@/lib/firebase/service';
@@ -39,6 +42,8 @@ const settingsSchema = z.object({
 
 export type SettingsData = z.infer<typeof settingsSchema>;
 
+type FoundArticle = ArticlePipelineOutput['foundArticles'][0];
+
 const defaultSources = [
   'https://huggingface.co/papers',
   'https://www.reddit.com/r/LocalLLaMA/',
@@ -49,6 +54,7 @@ export function SettingsForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   const form = useForm<z.infer<typeof settingsSchema>>({
@@ -99,16 +105,40 @@ export function SettingsForm() {
     }
   };
   
+  const processArticle = async (article: FoundArticle) => {
+    try {
+        setProcessingStatus(`Summarizing: ${article.title}`);
+        const summaryOutput = await summarizeArticle({ articleUrl: article.link });
+
+        let finalImage = summaryOutput.featuredImage;
+
+        if (!finalImage) {
+            setProcessingStatus(`Generating image for: ${article.title}`);
+            const imageOutput = await generateArticleImage({ articleDescription: `${summaryOutput.title} - ${summaryOutput.summary}` });
+            finalImage = imageOutput.imageUrl;
+        }
+        
+        setProcessingStatus(`Saving: ${article.title}`);
+        await addArticle({
+          ...summaryOutput,
+          featuredImage: finalImage,
+        });
+
+    } catch (error) {
+        console.error(`Error processing article ${article.link}:`, error);
+        // We can show a toast here if we want to notify about individual failures
+    }
+  };
+
   const handleRunPipeline = async () => {
     setIsProcessing(true);
+    setProcessingStatus('Finding articles...');
     toast({
       title: 'Starting AI Pipeline',
-      description: 'Finding and processing articles. This may take a moment...',
+      description: 'Finding articles. This may take a moment...',
     });
 
     try {
-      // For now, we'll just run the pipeline on the first source URL.
-      // A full implementation would run this on a schedule for all sources.
       const sources = form.getValues('sources').split('\n');
       const sourceUrl = sources[0];
 
@@ -124,21 +154,35 @@ export function SettingsForm() {
 
       const result = await runArticlePipeline({ sourceUrl });
       
-      let description = `${result.articlesAdded} new articles were added.`;
-      if (result.foundTitles && result.foundTitles.length > 0) {
-        description += `\n\nFound titles:\n- ${result.foundTitles.join('\n- ')}`;
-      } else if (result.articlesAdded === 0) {
-        description += "\nThe scraper couldn't find any article links on the source page."
+      if (!result.foundArticles || result.foundArticles.length === 0) {
+        toast({
+          title: 'Pipeline Complete!',
+          description: "The scraper couldn't find any new article links on the source page.",
+          duration: 9000,
+        });
+        setIsProcessing(false);
+        return;
       }
 
       toast({
+        title: 'Articles Found!',
+        description: `Now processing ${result.foundArticles.length} articles. This may take a few minutes.`,
+      });
+
+      let articlesAdded = 0;
+      for (const article of result.foundArticles) {
+        await processArticle(article);
+        articlesAdded++;
+      }
+      
+      setProcessingStatus('');
+      toast({
         title: 'Pipeline Complete!',
-        description: <pre className="whitespace-pre-wrap">{description}</pre>,
+        description: `${articlesAdded} new articles were added.`,
         duration: 9000,
       });
 
-      // Refresh the page to see the new posts
-      if (result.articlesAdded > 0) {
+      if (articlesAdded > 0) {
         router.refresh();
       }
 
@@ -146,11 +190,12 @@ export function SettingsForm() {
       console.error('Pipeline failed:', error);
       toast({
         title: 'Pipeline Failed',
-        description: 'Something went wrong while processing articles.',
+        description: (error as Error).message || 'Something went wrong while finding articles.',
         variant: 'destructive',
       });
     } finally {
       setIsProcessing(false);
+      setProcessingStatus('');
     }
   };
 
@@ -161,6 +206,8 @@ export function SettingsForm() {
       description: `The AI scraping service has been paused.`,
     });
   };
+
+  const buttonText = isProcessing ? processingStatus || 'Processing...' : 'Start / Run Now';
 
   return (
     <Form {...form}>
@@ -280,7 +327,7 @@ export function SettingsForm() {
                             ) : (
                                 <Play className="mr-2 h-4 w-4" />
                             )}
-                            {isProcessing ? 'Processing...' : 'Start / Run Now'}
+                            {buttonText}
                         </Button>
                         <Button variant="destructive" onClick={() => onServiceToggle('pause')}>
                             <Pause className="mr-2 h-4 w-4" />
