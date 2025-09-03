@@ -63,14 +63,24 @@ export function SettingsForm() {
   useEffect(() => {
     async function loadSettings() {
       setIsLoading(true);
-      const settings = await getSettings();
-      if (settings) {
-        form.reset(settings);
+      try {
+        const settings = await getSettings();
+        if (settings) {
+          form.reset(settings);
+        }
+      } catch (error) {
+          console.error("Failed to load settings:", error);
+          toast({
+              title: "Error",
+              description: "Could not load settings from the database.",
+              variant: "destructive",
+          })
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
     loadSettings();
-  }, [form]);
+  }, [form, toast]);
 
   const onSubmit = async (data: z.infer<typeof settingsSchema>) => {
     try {
@@ -108,18 +118,29 @@ export function SettingsForm() {
           description: 'Please provide at least one source URL.',
           variant: 'destructive',
         });
+        setIsProcessing(false);
         return;
       }
 
       const result = await runArticlePipeline({ sourceUrl });
       
+      let description = `${result.articlesAdded} new articles were added.`;
+      if (result.foundTitles && result.foundTitles.length > 0) {
+        description += `\n\nFound titles:\n- ${result.foundTitles.join('\n- ')}`;
+      } else if (result.articlesAdded === 0) {
+        description += "\nThe scraper couldn't find any article links on the source page."
+      }
+
       toast({
         title: 'Pipeline Complete!',
-        description: `${result.articlesAdded} new articles were added.`,
+        description: <pre className="whitespace-pre-wrap">{description}</pre>,
+        duration: 9000,
       });
 
       // Refresh the page to see the new posts
-      router.refresh();
+      if (result.articlesAdded > 0) {
+        router.refresh();
+      }
 
     } catch (error) {
       console.error('Pipeline failed:', error);

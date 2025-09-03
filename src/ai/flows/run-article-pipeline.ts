@@ -5,8 +5,8 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-import { summarizeArticle, SummarizeArticleOutput } from './summarize-articles';
+import { z } from 'zod';
+import { summarizeArticle } from './summarize-articles';
 import { generateArticleImage } from './generate-article-image';
 import { scrapeUrl } from '@/services/scraper';
 import { addArticle } from '@/lib/firebase/service';
@@ -20,6 +20,7 @@ export type ArticlePipelineInput = z.infer<typeof ArticlePipelineInputSchema>;
 const ArticlePipelineOutputSchema = z.object({
     message: z.string(),
     articlesAdded: z.number(),
+    foundTitles: z.array(z.string()),
 });
 export type ArticlePipelineOutput = z.infer<typeof ArticlePipelineOutputSchema>;
 
@@ -30,13 +31,13 @@ export async function runArticlePipeline(input: ArticlePipelineInput): Promise<A
 const findArticleLinksPrompt = ai.definePrompt({
     name: 'findArticleLinksPrompt',
     input: { schema: z.object({ content: z.string(), sourceUrl: z.string().url() }) },
-    output: { schema: z.object({ links: z.array(z.string().url()) }) },
-    prompt: `Based on the following content from {{sourceUrl}}, extract up to 5 of the most prominent article URLs.
+    output: { schema: z.object({ articles: z.array(z.object({ title: z.string(), link: z.string().url()})) }) },
+    prompt: `Based on the following content from {{sourceUrl}}, extract up to 5 of the most prominent articles, providing both the title and the full URL.
     
     Content:
     {{{content}}}
     
-    Return only the URLs in a JSON array.`,
+    Return only the data in a JSON array.`,
 });
 
 
@@ -49,19 +50,20 @@ const articlePipelineFlow = ai.defineFlow(
   async (input) => {
     // 1. Scrape the source URL to find article links
     const pageContent = await scrapeUrl(input.sourceUrl);
-    const { output: linkOutput } = await findArticleLinksPrompt({ content: pageContent, sourceUrl: input.sourceUrl });
+    const { output } = await findArticleLinksPrompt({ content: pageContent, sourceUrl: input.sourceUrl });
 
-    if (!linkOutput || !linkOutput.links || linkOutput.links.length === 0) {
+    if (!output || !output.articles || output.articles.length === 0) {
         console.log('No article links found.');
-        return { message: 'No new articles found.', articlesAdded: 0 };
+        return { message: 'No new articles found.', articlesAdded: 0, foundTitles: [] };
     }
     
+    const foundTitles = output.articles.map(a => a.title);
     let articlesAdded = 0;
     // 2. For each link, run the summarization and image generation flows in parallel
-    const processingPromises = linkOutput.links.map(async (articleUrl) => {
+    const processingPromises = output.articles.map(async (article) => {
       try {
         // Summarize the article
-        const summaryOutput = await summarizeArticle({ articleUrl });
+        const summaryOutput = await summarizeArticle({ articleUrl: article.link });
 
         let finalImage = summaryOutput.featuredImage;
 
@@ -79,7 +81,7 @@ const articlePipelineFlow = ai.defineFlow(
         articlesAdded++;
 
       } catch (error) {
-          console.error(`Error processing article ${articleUrl}:`, error);
+          console.error(`Error processing article ${article.link}:`, error);
       }
     });
 
@@ -88,6 +90,7 @@ const articlePipelineFlow = ai.defineFlow(
     return {
         message: `Pipeline completed. Added ${articlesAdded} new articles.`,
         articlesAdded,
+        foundTitles,
     };
   }
 );
