@@ -141,10 +141,12 @@ export function SettingsForm() {
     });
   };
 
-  if (isLoading) {
-    return (
-        <div className="grid gap-8 md:grid-cols-3">
-            <div className="md:col-span-2 space-y-8">
+  return (
+    <Form {...form}>
+      <div className="grid gap-8 md:grid-cols-3">
+        <div className="md:col-span-2">
+          {isLoading ? (
+             <div className="space-y-8">
                 <Card>
                     <CardHeader>
                         <CardTitle>Content Scraping</CardTitle>
@@ -169,14 +171,7 @@ export function SettingsForm() {
                 </Card>
                 <div className="h-10 w-28 animate-pulse rounded-md bg-muted"></div>
             </div>
-        </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-8 md:grid-cols-3">
-        <div className="md:col-span-2">
-            <Form {...form}>
+          ) : (
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                 <Card>
                     <CardHeader>
@@ -245,35 +240,36 @@ export function SettingsForm() {
                 
                 <Button type="submit">Save Settings</Button>
             </form>
-            </Form>
+          )}
+        </div>
+        <div className="space-y-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle>AI Service Control</CardTitle>
+                    <CardDescription>Manage the status of the automated AI service.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        Use these controls to manually run, pause, or resume the automatic fetching and posting of articles.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={handleRunPipeline} disabled={isProcessing}>
+                            {isProcessing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Play className="mr-2 h-4 w-4" />
+                            )}
+                            {isProcessing ? 'Processing...' : 'Start / Run Now'}
+                        </Button>
+                        <Button variant="destructive" onClick={() => onServiceToggle('pause')}>
+                            <Pause className="mr-2 h-4 w-4" />
+                            Pause
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
       </div>
-      <div className="space-y-8">
-        <Card>
-            <CardHeader>
-                <CardTitle>AI Service Control</CardTitle>
-                <CardDescription>Manage the status of the automated AI service.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col space-y-4">
-                 <p className="text-sm text-muted-foreground">
-                    Use these controls to manually run, pause, or resume the automatic fetching and posting of articles.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={handleRunPipeline} disabled={isProcessing}>
-                        {isProcessing ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <Play className="mr-2 h-4 w-4" />
-                        )}
-                        {isProcessing ? 'Processing...' : 'Start / Run Now'}
-                    </Button>
-                    <Button variant="destructive" onClick={() => onServiceToggle('pause')}>
-                        <Pause className="mr-2 h-4 w-4" />
-                        Pause
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
-      </div>
-    </div>
+    </Form>
   );
 }
