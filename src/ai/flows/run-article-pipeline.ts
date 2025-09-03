@@ -37,7 +37,7 @@ const findArticleLinksPrompt = ai.definePrompt({
     Content:
     {{{content}}}
     
-    Return only the data in a JSON array.`,
+    Return only the data in the specified JSON format. Do not include any other text or explanations.`,
 });
 
 
