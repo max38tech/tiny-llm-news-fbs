@@ -39,6 +39,7 @@ import { cn } from '@/lib/utils';
 
 const settingsSchema = z.object({
   sources: z.string().min(10, 'Please provide at least one URL.'),
+  articleTopic: z.string().min(5, 'Please provide a topic for the AI to focus on.'),
   frequency: z.string(),
   maxPosts: z.coerce.number().min(1, 'Must be at least 1.').max(10, 'Cannot exceed 10.'),
 });
@@ -65,6 +66,7 @@ export function SettingsForm() {
     resolver: zodResolver(settingsSchema),
     defaultValues: {
       sources: defaultSources,
+      articleTopic: 'running small LLMs on limited resources',
       frequency: '4',
       maxPosts: 3,
     },
@@ -122,7 +124,10 @@ export function SettingsForm() {
   const processArticle = async (article: FoundArticle) => {
     try {
         addLogMessage(`Summarizing: ${article.title}`);
-        const summaryOutput = await summarizeArticle({ articleUrl: article.link });
+        const summaryOutput = await summarizeArticle({ 
+            articleUrl: article.link,
+            articleTopic: form.getValues('articleTopic'),
+        });
 
         let finalImage = summaryOutput.featuredImage;
 
@@ -259,6 +264,10 @@ export function SettingsForm() {
                             <FormLabel>URL Sources</FormLabel>
                             <div className="h-[9.5rem] w-full animate-pulse rounded-md bg-muted"></div>
                         </div>
+                        <div className="space-y-2">
+                            <FormLabel>Article Topic</FormLabel>
+                            <div className="h-10 w-full animate-pulse rounded-md bg-muted"></div>
+                        </div>
                         <div className="grid gap-6 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <FormLabel>Scraping Frequency</FormLabel>
@@ -296,6 +305,22 @@ export function SettingsForm() {
                             <FormMessage />
                             </FormItem>
                         )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="articleTopic"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Article Topic</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g., running small LLMs on limited resources" {...field} />
+                                    </FormControl>
+                                    <FormDescription>
+                                        The AI will focus on this topic when summarizing articles.
+                                    </FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
                         />
                         <div className="grid gap-6 sm:grid-cols-2">
                         <FormField

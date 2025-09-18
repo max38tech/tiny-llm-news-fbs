@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, provider, signInWithPopup } from '@/lib/firebase';
+import { auth, provider, signInWithRedirect } from '@/lib/firebase';
 import { Button } from './ui/button';
 import { LogIn, LogOut } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
@@ -26,17 +26,14 @@ export function AuthButton() {
 
   const handleSignIn = async () => {
     try {
-      await signInWithPopup(auth, provider);
-      // onAuthStateChanged will handle the UI update
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
-      if (error.code !== 'auth/popup-closed-by-user') {
-        console.error('Error signing in with Google: ', error);
-        toast({
-            title: 'Authentication Failed',
-            description: error.message,
-            variant: 'destructive',
-          });
-      }
+      console.error('Error signing in with Google: ', error);
+      toast({
+          title: 'Authentication Failed',
+          description: error.message,
+          variant: 'destructive',
+        });
     }
   };
 

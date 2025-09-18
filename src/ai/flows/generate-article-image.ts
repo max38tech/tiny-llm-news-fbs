@@ -35,6 +35,9 @@ const generateArticleImageFlow = ai.defineFlow(
     const {media} = await ai.generate({
       model: 'googleai/imagen-4.0-fast-generate-001',
       prompt: `Generate an image that visually represents the following article content: ${input.articleDescription}`,
+      config: {
+        size: { width: 600, height: 400 },
+      }
     });
 
     if (!media) {

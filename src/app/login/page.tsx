@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { auth, provider, signInWithPopup, onAuthStateChanged, User } from '@/lib/firebase';
+import { auth, provider, getRedirectResult, signInWithRedirect, onAuthStateChanged } from '@/lib/firebase';
 import { Chrome } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,31 +33,49 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.push('/admin');
-      } else {
-        setLoading(false);
-      }
-    });
+    const checkAuth = async () => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                router.push('/admin');
+            } else {
+                 // No user, check for redirect result
+                getRedirectResult(auth)
+                    .then((result) => {
+                        if (result?.user) {
+                            router.push('/admin');
+                        } else {
+                            setLoading(false);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('Error getting redirect result: ', error);
+                        toast({
+                            title: 'Authentication Failed',
+                            description: error.message,
+                            variant: 'destructive',
+                        });
+                        setLoading(false);
+                    });
+            }
+        });
+        return () => unsubscribe();
+    }
+    checkAuth();
+  }, [router, toast]);
 
-    return () => unsubscribe();
-  }, [router]);
 
   const handleSignIn = async () => {
+    setLoading(true);
     try {
-      await signInWithPopup(auth, provider);
-      // The onAuthStateChanged listener will handle the redirect.
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
-      // Don't show an error if the user intentionally closes the popup.
-      if (error.code !== 'auth/popup-closed-by-user') {
-        console.error('Error signing in with Google: ', error);
-        toast({
-          title: 'Authentication Failed',
-          description: error.message,
-          variant: 'destructive',
-        });
-      }
+      console.error('Error signing in with Google: ', error);
+      toast({
+        title: 'Authentication Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setLoading(false);
     }
   };
   
