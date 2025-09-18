@@ -179,6 +179,11 @@ export function SettingsForm() {
             addLogMessage(`Scraping source: ${sourceUrl}`);
             const result = await runArticlePipeline({ sourceUrl });
             
+            if (result.message.startsWith('SCRAPE_ERROR:')) {
+                addLogMessage(`ERROR scraping ${sourceUrl}: ${result.message}`);
+                continue;
+            }
+
             if (!result.foundArticles || result.foundArticles.length === 0) {
               addLogMessage(result.message || `No new article links found on ${sourceUrl}.`);
               continue; // Try next source
@@ -390,5 +395,3 @@ export function SettingsForm() {
     </Form>
   );
 }
-
-    

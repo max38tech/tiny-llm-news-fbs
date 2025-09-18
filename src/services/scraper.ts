@@ -20,29 +20,25 @@ export async function scrapeUrl(url: string): Promise<string> {
         await page.waitForSelector('body');
 
         const pageText = await page.evaluate(() => {
-            // Prefer innerText as it's closer to what a user sees, but fallback to textContent
             return document.body.innerText || document.body.textContent;
         });
 
         if (!pageText || pageText.trim() === '') {
-            console.warn(`No text content found on ${url}. The page might be empty or require JavaScript.`);
-            // Trying to get the whole document as a fallback
              const fallbackContent = await page.content();
              if (fallbackContent) return fallbackContent;
-             return ''; // Return empty if still nothing.
+             return '';
         }
         
         return pageText;
         
     } catch (error) {
         console.error(`Error scraping ${url}:`, error);
-        // Return empty string on failure to allow the pipeline to handle it gracefully.
-        return '';
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        // Return a formatted error string to be caught by the caller
+        return `SCRAPE_ERROR: ${errorMessage}`;
     } finally {
         if (browser) {
             await browser.close();
         }
     }
 }
-
-    

@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview This flow orchestrates finding articles from a source URL.
@@ -56,6 +57,10 @@ const articlePipelineFlow = ai.defineFlow(
     // 1. Scrape the source URL to get a list of links
     const linkData = await scrapeUrl(input.sourceUrl);
     
+    if (linkData.startsWith('SCRAPE_ERROR:')) {
+        return { message: linkData, foundArticles: [] };
+    }
+
     if (!linkData) {
         return { message: 'Could not retrieve content from the source URL.', foundArticles: [] };
     }
