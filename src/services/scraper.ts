@@ -20,13 +20,20 @@ export async function scrapeUrl(url: string): Promise<string> {
         await page.waitForSelector('body');
 
         const pageText = await page.evaluate(() => {
-            return document.body.innerText || document.body.textContent;
+            // Try to find the main content area, but fall back to the whole body
+            const mainContent = document.querySelector('main') || document.body;
+            return mainContent.innerText || mainContent.textContent;
         });
 
         if (!pageText || pageText.trim() === '') {
-             const fallbackContent = await page.content();
-             if (fallbackContent) return fallbackContent;
-             return '';
+             // Fallback to grabbing all link text if main content is sparse
+             const linkData = await page.evaluate(() => {
+                return Array.from(document.querySelectorAll('a'))
+                           .map(a => `${a.textContent} - ${a.href}`)
+                           .join('\n');
+            });
+            if (linkData) return linkData;
+            return '';
         }
         
         return pageText;
