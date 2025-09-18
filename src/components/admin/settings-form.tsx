@@ -138,10 +138,11 @@ export function SettingsForm() {
           featuredImage: finalImage,
         });
         addLogMessage(`Successfully saved: ${article.title}`);
-
+        return true;
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         addLogMessage(`ERROR processing article ${article.link}: ${errorMessage}`);
+        return false;
     }
   };
 
@@ -150,12 +151,15 @@ export function SettingsForm() {
     setProcessingLog([]);
     addLogMessage('Starting AI Pipeline...');
 
+    let totalArticlesFound = 0;
+    let totalArticlesAdded = 0;
+
     try {
       const sources = form.getValues('sources').split('\n').filter(s => s.trim() !== '');
-      const sourceUrl = sources[0];
-
-      if (!sourceUrl) {
-        addLogMessage('ERROR: No source URL provided.');
+      const maxPosts = form.getValues('maxPosts');
+      
+      if (sources.length === 0) {
+        addLogMessage('ERROR: No source URLs provided.');
         toast({
           title: 'Error',
           description: 'Please provide at least one source URL.',
@@ -165,36 +169,47 @@ export function SettingsForm() {
         return;
       }
 
-      addLogMessage(`Scraping source: ${sourceUrl}`);
-      const result = await runArticlePipeline({ sourceUrl });
-      
-      if (!result.foundArticles || result.foundArticles.length === 0) {
-        addLogMessage(result.message || 'The scraper could not find any new article links on the source page.');
-        toast({
-          title: 'Pipeline Complete',
-          description: result.message || "Couldn't find any new article links.",
-        });
-        setIsProcessing(false);
-        return;
-      }
+      for (const sourceUrl of sources) {
+        if (totalArticlesAdded >= maxPosts) {
+            addLogMessage(`Maximum post limit (${maxPosts}) reached. Stopping pipeline.`);
+            break;
+        }
 
-      addLogMessage(`Found ${result.foundArticles.length} potential articles.`);
-      addLogMessage(`Beginning processing of articles. This may take a few minutes...`);
+        try {
+            addLogMessage(`Scraping source: ${sourceUrl}`);
+            const result = await runArticlePipeline({ sourceUrl });
+            
+            if (!result.foundArticles || result.foundArticles.length === 0) {
+              addLogMessage(result.message || `No new article links found on ${sourceUrl}.`);
+              continue; // Try next source
+            }
 
-      let articlesAdded = 0;
-      for (const article of result.foundArticles) {
-        await processArticle(article);
-        articlesAdded++;
+            totalArticlesFound += result.foundArticles.length;
+            addLogMessage(`Found ${result.foundArticles.length} potential articles from ${sourceUrl}.`);
+            
+            for (const article of result.foundArticles) {
+                 if (totalArticlesAdded >= maxPosts) break;
+                const success = await processArticle(article);
+                if (success) {
+                    totalArticlesAdded++;
+                }
+            }
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            addLogMessage(`ERROR processing source ${sourceUrl}: ${errorMessage}`);
+            continue; // Continue to the next source even if one fails
+        }
       }
       
-      addLogMessage(`Pipeline complete. ${articlesAdded} articles processed.`);
+      addLogMessage(`Pipeline complete. Found ${totalArticlesFound} potential articles and added ${totalArticlesAdded} new articles.`);
       toast({
         title: 'Pipeline Complete!',
-        description: `${articlesAdded} new articles were processed. Check the log for details.`,
+        description: `${totalArticlesAdded} new articles were processed. Check the log for details.`,
         duration: 9000,
       });
 
-      if (articlesAdded > 0) {
+      if (totalArticlesAdded > 0) {
         addLogMessage('Refreshing page data...');
         router.refresh();
       }
@@ -271,7 +286,7 @@ export function SettingsForm() {
                                 <Textarea rows={5} placeholder="Enter one URL per line" {...field} />
                             </FormControl>
                             <FormDescription>
-                                The AI will scrape these URLs for relevant articles. The pipeline only uses the first URL.
+                                The AI will scrape these URLs for relevant articles. The pipeline will try each URL in order.
                             </FormDescription>
                             <FormMessage />
                             </FormItem>
@@ -375,3 +390,5 @@ export function SettingsForm() {
     </Form>
   );
 }
+
+    

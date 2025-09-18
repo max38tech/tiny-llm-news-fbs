@@ -1,3 +1,4 @@
+
 'use server';
 
 import puppeteer from 'puppeteer';
@@ -24,9 +25,11 @@ export async function scrapeUrl(url: string): Promise<string> {
         });
 
         if (!pageText || pageText.trim() === '') {
-            console.error(`No text content found on ${url}`);
-            // Return an empty string or some indicator of failure
-            return '';
+            console.warn(`No text content found on ${url}. The page might be empty or require JavaScript.`);
+            // Trying to get the whole document as a fallback
+             const fallbackContent = await page.content();
+             if (fallbackContent) return fallbackContent;
+             return ''; // Return empty if still nothing.
         }
         
         return pageText;
@@ -41,3 +44,5 @@ export async function scrapeUrl(url: string): Promise<string> {
         }
     }
 }
+
+    
