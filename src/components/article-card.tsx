@@ -27,10 +27,15 @@ type ArticleCardProps = {
 export function ArticleCard({ article }: ArticleCardProps) {
   const preview = article.summary.split(' ').slice(0, 25).join(' ');
 
+  // A helper to check for a valid, non-empty, non-"null" string URL
+  const isValidImageUrl = (url: string | null | undefined): url is string => {
+    return typeof url === 'string' && url.trim() !== '' && url.trim().toLowerCase() !== 'null';
+  }
+
   return (
     <Card className="flex flex-col overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1">
       <CardHeader>
-        {article.featuredImage && (
+        {isValidImageUrl(article.featuredImage) && (
           <div className="relative aspect-video w-full overflow-hidden rounded-t-lg">
             <Image
               src={article.featuredImage}

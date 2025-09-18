@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, limit, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, limit, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import type { Article } from '@/lib/articles';
 import type { SettingsData } from '@/components/admin/settings-form';
 
@@ -40,6 +40,16 @@ export const getArticles = async (count: number = 10): Promise<Article[]> => {
         return []; // Return empty array on error
     }
 };
+
+export const updateArticle = async (id: string, data: { title: string; summary: string }): Promise<void> => {
+    try {
+        const articleDocRef = doc(db, ARTICLES_COLLECTION, id);
+        await updateDoc(articleDocRef, data);
+    } catch (e) {
+        console.error('Error updating document: ', e);
+        throw new Error('Failed to update article in the database');
+    }
+}
 
 export const saveSettings = async (settings: SettingsData): Promise<void> => {
     try {
