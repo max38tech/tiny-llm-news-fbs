@@ -65,15 +65,35 @@ const articlePipelineFlow = ai.defineFlow(
         return { message: 'Could not retrieve content from the source URL.', foundArticles: [] };
     }
 
-    const { output } = await findArticleLinksPrompt({ linkData, sourceUrl: input.sourceUrl });
+    // The AI can sometimes return conversational text or markdown with the JSON.
+    // We will try to extract the JSON object from the response string.
+    const rawOutput = (await findArticleLinksPrompt({ linkData, sourceUrl: input.sourceUrl })).output;
 
-    if (!output || !output.articles || output.articles.length === 0) {
+    let articlesOutput;
+
+    if (typeof rawOutput === 'string') {
+        const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                articlesOutput = ArticleLinksSchema.parse(JSON.parse(jsonMatch[0]));
+            } catch (e) {
+                 const errorMessage = e instanceof Error ? e.message : String(e);
+                return { message: `ERROR: Failed to parse JSON from AI response. Details: ${errorMessage}`, foundArticles: [] };
+            }
+        }
+    } else {
+        // If it's already an object, just parse it.
+        articlesOutput = ArticleLinksSchema.parse(rawOutput);
+    }
+    
+
+    if (!articlesOutput || !articlesOutput.articles || articlesOutput.articles.length === 0) {
         return { message: 'No new articles found.', foundArticles: [] };
     }
     
     return {
-        message: `Pipeline completed. Found ${output.articles.length} articles.`,
-        foundArticles: output.articles,
+        message: `Pipeline completed. Found ${articlesOutput.articles.length} articles.`,
+        foundArticles: articlesOutput.articles,
     };
   }
 );
