@@ -25,6 +25,7 @@ export async function scrapeUrl(url: string): Promise<string> {
 
         if (!pageText || pageText.trim() === '') {
             console.error(`No text content found on ${url}`);
+            // Return an empty string or some indicator of failure
             return '';
         }
         
