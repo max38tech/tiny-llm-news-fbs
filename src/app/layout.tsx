@@ -12,6 +12,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarFooter,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
@@ -41,6 +42,17 @@ function Logo() {
   );
 }
 
+function Header() {
+    return (
+        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+            <SidebarTrigger className="flex md:hidden" />
+            <div className='w-full flex-1'>
+                {/* Add Mobile nav items here */}
+            </div>
+        </header>
+    )
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -58,7 +70,7 @@ export default function RootLayout({
       </head>
       <body className={cn('font-body antialiased min-h-screen bg-background')}>
         <SidebarProvider>
-          <Sidebar>
+          <Sidebar collapsible='offcanvas'>
             <SidebarHeader>
               <div className="flex items-center gap-3">
                 <Logo />
@@ -91,7 +103,17 @@ export default function RootLayout({
                 <AuthButton />
             </SidebarFooter>
           </Sidebar>
-          <SidebarInset>{children}</SidebarInset>
+          <SidebarInset>
+            <div className="flex flex-col h-screen">
+                <header className="flex h-14 items-center justify-between gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
+                    <SidebarTrigger />
+                    <div className="flex items-center gap-4">
+                    {/* Future header items can go here */}
+                    </div>
+                </header>
+                <main className="flex-1 overflow-auto">{children}</main>
+            </div>
+          </SidebarInset>
         </SidebarProvider>
         <Toaster />
       </body>
