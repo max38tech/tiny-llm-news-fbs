@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, limit, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, limit, doc, setDoc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import type { Article } from '@/lib/articles';
 import type { SettingsData } from '@/components/admin/settings-form';
 
@@ -31,7 +31,14 @@ export const getArticles = async (count: number = 10): Promise<Article[]> => {
         
         const articles: Article[] = [];
         querySnapshot.forEach((doc) => {
-            articles.push({ id: doc.id, ...doc.data() } as Article);
+            const data = doc.data();
+            const articleData = {
+                id: doc.id,
+                ...data,
+                // Convert Firestore Timestamp to a serializable format (ISO string)
+                createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
+            } as Article;
+            articles.push(articleData);
         });
 
         return articles;

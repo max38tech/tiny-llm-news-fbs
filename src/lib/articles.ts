@@ -1,7 +1,7 @@
 import type { SummarizeArticleOutput } from '@/ai/flows/summarize-articles';
 import { getArticles as getArticlesFromDb } from '@/lib/firebase/service';
 
-export type Article = SummarizeArticleOutput & { id: string; title: string };
+export type Article = SummarizeArticleOutput & { id: string; title: string; createdAt: string; };
 
 export const getArticles = async (): Promise<Article[]> => {
     // This now fetches from our Firestore database.

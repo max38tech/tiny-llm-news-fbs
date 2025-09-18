@@ -111,7 +111,7 @@ export function PostsTable({ articles: initialArticles }: { articles: Article[] 
             {articles.map((article) => (
               <TableRow key={article.id}>
                 <TableCell className="font-medium max-w-sm truncate">{article.title}</TableCell>
-                <TableCell className="hidden md:table-cell">{(new Date()).toLocaleDateString()}</TableCell>
+                <TableCell className="hidden md:table-cell">{new Date(article.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => handleEditClick(article)}>
                     <Edit className="h-4 w-4" />
