@@ -119,12 +119,12 @@ export function SettingsForm() {
     }
   };
   
-  const processArticle = async (article: FoundArticle) => {
+  const processArticle = async (article: FoundArticle, articleTopic: string) => {
     try {
         addLogMessage(`Summarizing: ${article.title}`);
         const summaryOutput = await summarizeArticle({ 
             articleUrl: article.link,
-            articleTopic: form.getValues('articleTopic'),
+            articleTopic: articleTopic,
         });
 
         let finalImage = summaryOutput.featuredImage;
@@ -158,10 +158,10 @@ export function SettingsForm() {
     let totalArticlesAdded = 0;
 
     try {
-      const sources = form.getValues('sources').split('\n').filter(s => s.trim() !== '');
-      const maxPosts = form.getValues('maxPosts');
+      const { sources, maxPosts, articleTopic } = form.getValues();
+      const sourceUrls = sources.split('\n').filter(s => s.trim() !== '');
       
-      if (sources.length === 0) {
+      if (sourceUrls.length === 0) {
         addLogMessage('ERROR: No source URLs provided.');
         toast({
           title: 'Error',
@@ -172,7 +172,7 @@ export function SettingsForm() {
         return;
       }
 
-      for (const sourceUrl of sources) {
+      for (const sourceUrl of sourceUrls) {
         if (totalArticlesAdded >= maxPosts) {
             addLogMessage(`Maximum post limit (${maxPosts}) reached. Stopping pipeline.`);
             break;
@@ -197,7 +197,7 @@ export function SettingsForm() {
             
             for (const article of result.foundArticles) {
                  if (totalArticlesAdded >= maxPosts) break;
-                const success = await processArticle(article);
+                const success = await processArticle(article, articleTopic);
                 if (success) {
                     totalArticlesAdded++;
                 }
@@ -418,5 +418,3 @@ export function SettingsForm() {
     </Form>
   );
 }
-
-    
