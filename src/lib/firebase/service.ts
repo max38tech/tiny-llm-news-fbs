@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, limit, doc, setDoc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, limit, doc, setDoc, getDoc, updateDoc, Timestamp, deleteDoc } from 'firebase/firestore';
 import type { Article } from '@/lib/articles';
 import type { SettingsData } from '@/components/admin/settings-form';
 
@@ -32,7 +32,7 @@ export const addArticle = async (article: ArticleData): Promise<string> => {
   }
 };
 
-export const getArticles = async (count: number = 10): Promise<Article[]> => {
+export const getArticles = async (count: number = 20): Promise<Article[]> => {
     try {
         const articlesCollection = collection(db, ARTICLES_COLLECTION);
         const q = query(articlesCollection, orderBy('createdAt', 'desc'), limit(count));
@@ -53,7 +53,7 @@ export const getArticles = async (count: number = 10): Promise<Article[]> => {
         return articles;
     } catch (e) {
         console.error("Error getting documents: ", e);
-        return []; // Return empty array on error
+        throw new Error("Failed to get articles from database.")
     }
 };
 
@@ -64,6 +64,16 @@ export const updateArticle = async (id: string, data: { title: string; summary: 
     } catch (e) {
         console.error('Error updating document: ', e);
         throw new Error('Failed to update article in the database');
+    }
+}
+
+export const deleteArticle = async (id: string): Promise<void> => {
+    try {
+        const articleDocRef = doc(db, ARTICLES_COLLECTION, id);
+        await deleteDoc(articleDocRef);
+    } catch (e) {
+        console.error('Error deleting document: ', e);
+        throw new Error('Failed to delete article from the database');
     }
 }
 
@@ -95,7 +105,7 @@ export const getSettings = async (): Promise<SettingsData | null> => {
         return null;
     } catch (e) {
         console.error('Error fetching settings: ', e);
-        return null;
+        throw new Error("Failed to get settings from database.")
     }
 }
 
@@ -132,6 +142,6 @@ export const getPipelineRunLogs = async (count: number = 20): Promise<PipelineRu
         return logs;
     } catch (e) {
         console.error("Error getting run logs: ", e);
-        return [];
+        throw new Error("Failed to get run logs from database.")
     }
 };

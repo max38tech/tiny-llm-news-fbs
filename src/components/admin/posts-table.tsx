@@ -32,14 +32,15 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Edit, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { updateArticle } from '@/lib/firebase/service';
+import { updateArticle, getArticles as getArticlesFromDb, deleteArticle } from '@/lib/firebase/service';
+import { Skeleton } from '../ui/skeleton';
 
 const editArticleSchema = z.object({
     title: z.string().min(1, 'Title is required.'),
@@ -48,9 +49,10 @@ const editArticleSchema = z.object({
 
 type EditArticleData = z.infer<typeof editArticleSchema>;
 
-export function PostsTable({ articles: initialArticles }: { articles: Article[] }) {
+export function PostsTable() {
   const { toast } = useToast();
-  const [articles, setArticles] = useState(initialArticles);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
 
@@ -58,13 +60,41 @@ export function PostsTable({ articles: initialArticles }: { articles: Article[] 
     resolver: zodResolver(editArticleSchema),
   });
 
-  const handleDelete = (articleId: string) => {
-    // In a real app, this would be an API call
-    setArticles(articles.filter(a => a.id !== articleId));
-    toast({
-      title: 'Post Deleted',
-      description: 'The article has been removed successfully.',
-    });
+  useEffect(() => {
+    const fetchArticles = async () => {
+        setIsLoading(true);
+        try {
+            const fetchedArticles = await getArticlesFromDb();
+            setArticles(fetchedArticles);
+        } catch (error) {
+            console.error("Failed to fetch articles:", error);
+            toast({
+                title: "Error",
+                description: "Could not load articles from the database.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    fetchArticles();
+  }, [toast]);
+
+  const handleDelete = async (articleId: string) => {
+    try {
+        await deleteArticle(articleId);
+        setArticles(articles.filter(a => a.id !== articleId));
+        toast({
+          title: 'Post Deleted',
+          description: 'The article has been removed successfully.',
+        });
+    } catch (error) {
+        toast({
+            title: 'Delete Failed',
+            description: 'Could not delete the article from the database.',
+            variant: 'destructive',
+        });
+    }
   };
 
   const handleEditClick = (article: Article) => {
@@ -94,6 +124,31 @@ export function PostsTable({ articles: initialArticles }: { articles: Article[] 
             variant: 'destructive',
         });
     }
+  }
+
+  if (isLoading) {
+    return (
+        <div className="rounded-lg border">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead className="hidden md:table-cell">Date Added</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={i}>
+                            <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                            <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-8 w-20 inline-block" /></TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </div>
+    )
   }
 
   return (

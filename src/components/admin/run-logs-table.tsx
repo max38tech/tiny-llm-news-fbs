@@ -19,13 +19,39 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPipelineRunLogs as getPipelineRunLogsFromDb } from '@/lib/firebase/service';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '../ui/skeleton';
 
-export function RunLogsTable({ runLogs }: { runLogs: PipelineRun[] }) {
+export function RunLogsTable() {
+  const { toast } = useToast();
+  const [runLogs, setRunLogs] = useState<PipelineRun[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<PipelineRun | null>(null);
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      setIsLoading(true);
+      try {
+        const logs = await getPipelineRunLogsFromDb();
+        setRunLogs(logs);
+      } catch (error) {
+        console.error("Failed to fetch run logs:", error);
+        toast({
+          title: "Error",
+          description: "Could not load run logs from the database.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchLogs();
+  }, [toast]);
 
   const getStatusVariant = (status: PipelineRun['status']) => {
     switch (status) {
@@ -39,6 +65,33 @@ export function RunLogsTable({ runLogs }: { runLogs: PipelineRun[] }) {
         return 'outline';
     }
   };
+
+  if (isLoading) {
+    return (
+        <div className="rounded-lg border">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Run Time</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Articles Added</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={i}>
+                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-4" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-8 w-10 inline-block" /></TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </div>
+    )
+  }
 
   return (
     <>

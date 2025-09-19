@@ -1,15 +1,12 @@
+'use client';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SettingsForm } from "@/components/admin/settings-form";
 import { PostsTable } from "@/components/admin/posts-table";
-import { getArticles } from "@/lib/articles";
 import AuthGuard from "@/components/admin/auth-guard";
-import { getPipelineRunLogs } from "@/lib/firebase/service";
 import { RunLogsTable } from "@/components/admin/run-logs-table";
 
-export default async function AdminPage() {
-    const articles = await getArticles();
-    const runLogs = await getPipelineRunLogs();
-
+export default function AdminPage() {
     return (
         <AuthGuard>
             <div className="p-4 md:p-8">
@@ -28,10 +25,10 @@ export default async function AdminPage() {
                         <TabsTrigger value="settings">Settings</TabsTrigger>
                     </TabsList>
                     <TabsContent value="posts" className="mt-6">
-                        <PostsTable articles={articles} />
+                        <PostsTable />
                     </TabsContent>
                     <TabsContent value="logs" className="mt-6">
-                        <RunLogsTable runLogs={runLogs} />
+                        <RunLogsTable />
                     </TabsContent>
                     <TabsContent value="settings" className="mt-6">
                         <SettingsForm />
