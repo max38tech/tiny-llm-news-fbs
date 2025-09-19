@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import type { Article } from '@/lib/articles';
 import {
@@ -20,38 +19,37 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 type ArticleCardProps = {
   article: Article;
+  onMarkAsRead: (articleId: string) => void;
 };
 
-export function ArticleCard({ article }: ArticleCardProps) {
-  const preview = article.summary.split(' ').slice(0, 25).join(' ');
+export function ArticleCard({ article, onMarkAsRead }: ArticleCardProps) {
+  const preview = article.summary.split(' ').slice(0, 30).join(' ');
 
-  // A helper to check for a valid, non-empty, non-"null" string URL
-  const isValidImageUrl = (url: string | null | undefined): url is string => {
-    return typeof url === 'string' && url.trim() !== '' && url.trim().toLowerCase() !== 'null';
-  }
+  const handleHideClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent the dialog from opening
+    onMarkAsRead(article.id);
+  };
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className="flex flex-col overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 cursor-pointer hover:-translate-y-1">
+        <Card className="flex flex-col overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 cursor-pointer hover:-translate-y-1 group relative">
+           <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              onClick={handleHideClick}
+              aria-label="Mark as read"
+            >
+              <X className="h-4 w-4" />
+            </Button>
             <CardHeader>
-              {isValidImageUrl(article.featuredImage) && (
-                <div className="relative aspect-video w-full overflow-hidden rounded-t-lg">
-                  <Image
-                    src={article.featuredImage}
-                    alt={article.title || 'Article image'}
-                    data-ai-hint="tech llm"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              )}
-              <CardTitle className="pt-4">{article.title}</CardTitle>
+              <CardTitle>{article.title}</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow">
               <p className="text-muted-foreground">
@@ -59,12 +57,9 @@ export function ArticleCard({ article }: ArticleCardProps) {
               </p>
             </CardContent>
           <CardFooter>
-            <Button asChild variant="link" className="pl-0">
-              <Link href={article.originalArticleUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                Read Original Article
-                <ArrowUpRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            <span className="text-sm text-muted-foreground">
+              {new Date(article.createdAt).toLocaleDateString()}
+            </span>
           </CardFooter>
         </Card>
       </DialogTrigger>
@@ -77,7 +72,10 @@ export function ArticleCard({ article }: ArticleCardProps) {
               </ScrollArea>
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter>
+        <DialogFooter className="justify-between items-center">
+            <span className="text-sm text-muted-foreground">
+              {new Date(article.createdAt).toLocaleDateString()}
+            </span>
              <Button asChild variant="link" className="pl-0">
                 <Link href={article.originalArticleUrl} target="_blank" rel="noopener noreferrer">
                     Read Original Article
