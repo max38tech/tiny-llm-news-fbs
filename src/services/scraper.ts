@@ -42,3 +42,5 @@ export async function scrapeUrl(url: string): Promise<string> {
         return `SCRAPE_ERROR: ${errorMessage}`;
     }
 }
+
+    

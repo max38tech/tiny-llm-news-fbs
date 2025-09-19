@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { runArticlePipeline } from '@/ai/flows/run-article-pipeline';
 import { summarizeArticle } from '@/ai/flows/summarize-articles';
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
 
     const sources = settings.sources.split('\n').filter(s => s.trim() !== '');
     const maxPosts = settings.maxPosts;
+    const articleTopic = settings.articleTopic;
 
     for (const sourceUrl of sources) {
         if (articlesAdded >= maxPosts) {
@@ -48,7 +50,10 @@ export async function GET(request: Request) {
             
             try {
                 console.log(`Summarizing: ${foundArticle.title}`);
-                const summaryOutput = await summarizeArticle({ articleUrl: foundArticle.link });
+                const summaryOutput = await summarizeArticle({ 
+                    articleUrl: foundArticle.link,
+                    articleTopic: articleTopic,
+                });
 
                 let finalImage = summaryOutput.featuredImage;
 
@@ -83,3 +88,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
+
+    

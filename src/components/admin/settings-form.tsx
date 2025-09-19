@@ -50,8 +50,6 @@ type FoundArticle = ArticlePipelineOutput['foundArticles'][0];
 
 const defaultSources = [
   'https://huggingface.co/papers',
-  'https://www.reddit.com/r/LocalLLaMA/',
-  'https://www.reddit.com/r/LocalLLM/',
 ].join('\n');
 
 export function SettingsForm() {
@@ -185,7 +183,7 @@ export function SettingsForm() {
             const result = await runArticlePipeline({ sourceUrl });
             
             if (result.message.startsWith('SCRAPE_ERROR:')) {
-                addLogMessage(`ERROR scraping ${sourceUrl}: ${result.message}`);
+                addLogMessage(`ERROR scraping ${sourceUrl}: ${result.message.replace('SCRAPE_ERROR: ', '')}`);
                 continue;
             }
 
@@ -420,3 +418,5 @@ export function SettingsForm() {
     </Form>
   );
 }
+
+    
