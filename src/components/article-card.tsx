@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Article } from '@/lib/articles';
@@ -16,6 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { ArrowUpRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -33,51 +36,56 @@ export function ArticleCard({ article }: ArticleCardProps) {
   }
 
   return (
-    <Card className="flex flex-col overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1">
-      <CardHeader>
-        {isValidImageUrl(article.featuredImage) && (
-          <div className="relative aspect-video w-full overflow-hidden rounded-t-lg">
-            <Image
-              src={article.featuredImage}
-              alt={article.title || 'Article image'}
-              data-ai-hint="tech llm"
-              fill
-              className="object-cover"
-            />
-          </div>
-        )}
-        <CardTitle className="pt-4">{article.title}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-grow">
-        <p className="text-muted-foreground">
-          {preview}...
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="link" className="pl-1 text-accent">
-                more...
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{article.title}</DialogTitle>
-                <DialogDescription asChild>
-                    <ScrollArea className="max-h-[60vh] pr-4">
-                        <p className="py-4 text-foreground/90">{article.summary}</p>
-                    </ScrollArea>
-                </DialogDescription>
-              </DialogHeader>
-            </DialogContent>
-          </Dialog>
-        </p>
-      </CardContent>
-      <CardFooter>
-        <Button asChild variant="link" className="pl-0">
-          <Link href={article.originalArticleUrl} target="_blank" rel="noopener noreferrer">
-            Read Original Article
-            <ArrowUpRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
-      </CardFooter>
-    </Card>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Card className="flex flex-col overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/20 cursor-pointer hover:-translate-y-1">
+            <CardHeader>
+              {isValidImageUrl(article.featuredImage) && (
+                <div className="relative aspect-video w-full overflow-hidden rounded-t-lg">
+                  <Image
+                    src={article.featuredImage}
+                    alt={article.title || 'Article image'}
+                    data-ai-hint="tech llm"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              )}
+              <CardTitle className="pt-4">{article.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-grow">
+              <p className="text-muted-foreground">
+                {preview}...
+              </p>
+            </CardContent>
+          <CardFooter>
+            <Button asChild variant="link" className="pl-0">
+              <Link href={article.originalArticleUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                Read Original Article
+                <ArrowUpRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{article.title}</DialogTitle>
+          <DialogDescription asChild>
+              <ScrollArea className="max-h-[60vh] pr-4">
+                  <p className="py-4 text-foreground/90">{article.summary}</p>
+              </ScrollArea>
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+             <Button asChild variant="link" className="pl-0">
+                <Link href={article.originalArticleUrl} target="_blank" rel="noopener noreferrer">
+                    Read Original Article
+                    <ArrowUpRight className="ml-2 h-4 w-4" />
+                </Link>
+            </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
