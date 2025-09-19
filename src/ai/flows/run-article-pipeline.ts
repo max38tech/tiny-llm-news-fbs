@@ -1,29 +1,31 @@
 
 'use server';
 /**
- * @fileOverview This flow orchestrates finding articles from a source URL.
- * It no longer processes them, returning the found links to the client.
+ * @fileOverview This flow orchestrates finding and summarizing articles from a source URL.
+ * It identifies relevant article links, scrapes their content, and returns summaries.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { scrapeUrl } from '@/services/scraper';
 
 const ArticlePipelineInputSchema = z.object({
   sourceUrl: z.string().url().describe('The URL of the source to find articles from (e.g., a news site or blog).'),
+  articleTopic: z.string().describe('The key topic to focus on when selecting and summarizing articles.')
 });
 export type ArticlePipelineInput = z.infer<typeof ArticlePipelineInputSchema>;
 
-const FoundArticleSchema = z.object({
-    title: z.string(),
-    link: z.string().url(),
+const ProcessedArticleSchema = z.object({
+  title: z.string().describe('The title of the article.'),
+  summary: z.string().describe('The summarized content of the article.'),
+  originalArticleUrl: z.string().url().describe('The URL of the original article.'),
+  featuredImage: z.string().optional().describe('URL of the featured image if available.')
 });
-export type FoundArticle = z.infer<typeof FoundArticleSchema>;
+export type ProcessedArticle = z.infer<typeof ProcessedArticleSchema>;
 
 
 const ArticlePipelineOutputSchema = z.object({
-    message: z.string(),
-    foundArticles: z.array(FoundArticleSchema),
+  message: z.string(),
+  processedArticles: z.array(ProcessedArticleSchema),
 });
 export type ArticlePipelineOutput = z.infer<typeof ArticlePipelineOutputSchema>;
 
@@ -31,21 +33,21 @@ export async function runArticlePipeline(input: ArticlePipelineInput): Promise<A
   return articlePipelineFlow(input);
 }
 
-const findArticleLinksPrompt = ai.definePrompt({
-    name: 'findArticleLinksPrompt',
-    input: { schema: z.object({ linkData: z.string(), sourceUrl: z.string().url() }) },
-    output: { format: 'json', schema: z.object({ articles: z.array(FoundArticleSchema) }) },
-    prompt: `You are an expert at identifying primary news articles from a raw list of hyperlinks. 
-Based on the following hyperlink data from {{sourceUrl}}, extract up to 5 of the most prominent articles.
-A prominent article will have a descriptive title and a URL that looks like a direct link to a story, not a category or author page.
+const processArticlesPrompt = ai.definePrompt({
+    name: 'processArticlesPrompt',
+    input: { schema: ArticlePipelineInputSchema },
+    output: { schema: z.object({ articles: z.array(ProcessedArticleSchema) }) },
+    prompt: `You are an AI expert tasked with building a news digest about "{{articleTopic}}".
 
-Link Data:
-{{{linkData}}}
-    
+Your job is to perform the following steps:
+1.  **Analyze the source URL**: Visit the provided source URL: {{sourceUrl}}.
+2.  **Identify Relevant Articles**: From the source, identify up to 3 of the most prominent and relevant articles related to the topic of "{{articleTopic}}".
+3.  **Scrape and Summarize**: For each identified article, navigate to its URL, scrape its content, and write a detailed summary (around 200-250 words) that focuses on information relevant to "{{articleTopic}}".
+4.  **Extract Details**: For each article, extract the title and the original URL. Attempt to find a featured image URL if one is available and prominent (do not select logos or icons).
+5.  **Return JSON**: Return a JSON object containing a list of the processed articles.
+
 CRITICAL: Your response must contain ONLY the raw JSON object, without any markdown, conversational text, or other characters. Do not include 'json' or \`\`\` in your response.`,
 });
-
-const ArticleLinksSchema = z.object({ articles: z.array(FoundArticleSchema) });
 
 const articlePipelineFlow = ai.defineFlow(
   {
@@ -54,43 +56,15 @@ const articlePipelineFlow = ai.defineFlow(
     outputSchema: ArticlePipelineOutputSchema,
   },
   async (input) => {
-    // 1. Scrape the source URL to get its content (either links or body text)
-    const scrapedContent = await scrapeUrl(input.sourceUrl);
-    
-    if (scrapedContent.startsWith('SCRAPE_ERROR:')) {
-        return { message: scrapedContent, foundArticles: [] };
-    }
+    const { output } = await processArticlesPrompt(input);
 
-    if (!scrapedContent) {
-        return { message: 'Could not retrieve content from the source URL.', foundArticles: [] };
-    }
-    
-    // The scrape might return links or just text. The prompt can handle either.
-    const { output } = await findArticleLinksPrompt({ linkData: scrapedContent, sourceUrl: input.sourceUrl });
-    
-    let articlesOutput;
-     if (typeof output === 'string') {
-        const jsonMatch = output.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            try {
-                articlesOutput = ArticleLinksSchema.parse(JSON.parse(jsonMatch[0]));
-            } catch (e) {
-                 const errorMessage = e instanceof Error ? e.message : String(e);
-                return { message: `ERROR: Failed to parse JSON from AI response. Details: ${errorMessage}`, foundArticles: [] };
-            }
-        }
-    } else {
-        articlesOutput = ArticleLinksSchema.parse(output);
-    }
-    
-
-    if (!articlesOutput || !articlesOutput.articles || articlesOutput.articles.length === 0) {
-        return { message: 'No new articles found.', foundArticles: [] };
+    if (!output || !output.articles || output.articles.length === 0) {
+        return { message: 'No new articles were processed.', processedArticles: [] };
     }
     
     return {
-        message: `Pipeline completed. Found ${articlesOutput.articles.length} articles.`,
-        foundArticles: articlesOutput.articles,
+        message: `Pipeline completed. Processed ${output.articles.length} articles.`,
+        processedArticles: output.articles,
     };
   }
 );

@@ -1,7 +1,6 @@
 
 import { NextResponse } from 'next/server';
 import { runArticlePipeline } from '@/ai/flows/run-article-pipeline';
-import { summarizeArticle } from '@/ai/flows/summarize-articles';
 import { addArticle } from '@/lib/firebase/service';
 import { getSettings } from '@/lib/firebase/service';
 
@@ -37,43 +36,34 @@ export async function GET(request: Request) {
         }
 
         console.log(`Processing source: ${sourceUrl}`);
-        const pipelineResult = await runArticlePipeline({ sourceUrl });
+        const pipelineResult = await runArticlePipeline({ sourceUrl, articleTopic });
 
         if (pipelineResult.message.startsWith('ERROR')) {
             console.error(`Error processing source ${sourceUrl}: ${pipelineResult.message}`);
             continue;
         }
 
-        if (!pipelineResult.foundArticles || pipelineResult.foundArticles.length === 0) {
-            console.log(`No articles found for ${sourceUrl}.`);
+        if (!pipelineResult.processedArticles || pipelineResult.processedArticles.length === 0) {
+            console.log(`No articles processed for ${sourceUrl}.`);
             continue;
         }
 
-        for (const foundArticle of pipelineResult.foundArticles) {
+        for (const processedArticle of pipelineResult.processedArticles) {
             if (articlesAdded >= maxPosts) break;
             
             try {
-                console.log(`Summarizing: ${foundArticle.title}`);
-                const summaryOutput = await summarizeArticle({ 
-                    articleUrl: foundArticle.link,
-                    articleTopic: articleTopic,
-                });
-
-                // Image generation is disabled to avoid oversized documents.
-                const finalImage = summaryOutput.featuredImage || '';
-
-                console.log(`Saving to database: ${summaryOutput.title}`);
+                console.log(`Saving to database: ${processedArticle.title}`);
                 await addArticle({
-                    ...summaryOutput,
-                    featuredImage: finalImage,
+                    ...processedArticle,
+                    featuredImage: processedArticle.featuredImage || '',
                 });
                 
                 articlesAdded++;
-                console.log(`Successfully saved: ${summaryOutput.title}`);
+                console.log(`Successfully saved: ${processedArticle.title}`);
 
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                console.error(`Error processing article ${foundArticle.link}:`, errorMessage);
+                console.error(`Error processing article ${processedArticle.originalArticleUrl}:`, errorMessage);
             }
         }
     }

@@ -27,8 +27,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Play, Pause, Loader2 } from 'lucide-react';
 import { runArticlePipeline, ArticlePipelineOutput } from '@/ai/flows/run-article-pipeline';
-import { summarizeArticle } from '@/ai/flows/summarize-articles';
-import { generateArticleImage } from '@/ai/flows/generate-article-image';
 import { addArticle } from '@/lib/firebase/service';
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -46,10 +44,10 @@ const settingsSchema = z.object({
 
 export type SettingsData = z.infer<typeof settingsSchema>;
 
-type FoundArticle = ArticlePipelineOutput['foundArticles'][0];
-
 const defaultSources = [
   'https://huggingface.co/papers',
+  'https://www.reddit.com/r/LocalLLaMA/',
+  'https://www.reddit.com/r/LocalLLM/',
 ].join('\n');
 
 export function SettingsForm() {
@@ -118,44 +116,12 @@ export function SettingsForm() {
         });
     }
   };
-  
-  const processArticle = async (article: FoundArticle, articleTopic: string) => {
-    try {
-        addLogMessage(`Summarizing: ${article.title}`);
-        const summaryOutput = await summarizeArticle({ 
-            articleUrl: article.link,
-            articleTopic: articleTopic,
-        });
-
-        let finalImage = summaryOutput.featuredImage;
-
-        // We no longer generate images to avoid file size issues.
-        // if (!finalImage) {
-        //     addLogMessage(`Generating image for: ${article.title}`);
-        //     const imageOutput = await generateArticleImage({ articleDescription: `${summaryOutput.title} - ${summaryOutput.summary}` });
-        //     finalImage = imageOutput.imageUrl;
-        // }
-        
-        addLogMessage(`Saving to database: ${article.title}`);
-        await addArticle({
-          ...summaryOutput,
-          featuredImage: finalImage,
-        });
-        addLogMessage(`Successfully saved: ${article.title}`);
-        return true;
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        addLogMessage(`ERROR processing article ${article.link}: ${errorMessage}`);
-        return false;
-    }
-  };
 
   const handleRunPipeline = async () => {
     setIsProcessing(true);
     setProcessingLog([]);
     addLogMessage('Starting AI Pipeline...');
 
-    let totalArticlesFound = 0;
     let totalArticlesAdded = 0;
 
     try {
@@ -181,26 +147,33 @@ export function SettingsForm() {
 
         try {
             addLogMessage(`Searching for articles in: ${sourceUrl}`);
-            const result = await runArticlePipeline({ sourceUrl });
+            const result = await runArticlePipeline({ sourceUrl, articleTopic });
             
             if (result.message.startsWith('ERROR')) {
                 addLogMessage(`ERROR processing ${sourceUrl}: ${result.message.replace('ERROR: ', '')}`);
                 continue;
             }
 
-            if (!result.foundArticles || result.foundArticles.length === 0) {
-              addLogMessage(result.message || `No new article links found on ${sourceUrl}.`);
+            if (!result.processedArticles || result.processedArticles.length === 0) {
+              addLogMessage(result.message || `No new articles processed from ${sourceUrl}.`);
               continue; // Try next source
             }
-
-            totalArticlesFound += result.foundArticles.length;
-            addLogMessage(`Found ${result.foundArticles.length} potential articles from ${sourceUrl}.`);
             
-            for (const article of result.foundArticles) {
-                 if (totalArticlesAdded >= maxPosts) break;
-                const success = await processArticle(article, articleTopic);
-                if (success) {
+            addLogMessage(`Found and processed ${result.processedArticles.length} articles from ${sourceUrl}.`);
+            
+            for (const article of result.processedArticles) {
+                if (totalArticlesAdded >= maxPosts) break;
+                try {
+                    addLogMessage(`Saving to database: ${article.title}`);
+                    await addArticle({
+                      ...article,
+                      featuredImage: article.featuredImage || '',
+                    });
+                    addLogMessage(`Successfully saved: ${article.title}`);
                     totalArticlesAdded++;
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    addLogMessage(`ERROR saving article "${article.title}": ${errorMessage}`);
                 }
             }
 
@@ -211,7 +184,7 @@ export function SettingsForm() {
         }
       }
       
-      addLogMessage(`Pipeline complete. Found ${totalArticlesFound} potential articles and added ${totalArticlesAdded} new articles.`);
+      addLogMessage(`Pipeline complete. Added ${totalArticlesAdded} new articles.`);
       toast({
         title: 'Pipeline Complete!',
         description: `${totalArticlesAdded} new articles were processed. Check the log for details.`,
