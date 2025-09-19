@@ -27,7 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Play, Pause, Loader2 } from 'lucide-react';
 import { runArticlePipeline, ArticlePipelineOutput } from '@/ai/flows/run-article-pipeline';
-import { addArticle } from '@/lib/firebase/service';
+import { addArticle, addPipelineRunLog } from '@/lib/firebase/service';
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSettings, saveSettings } from '@/lib/firebase/service';
@@ -38,7 +38,8 @@ import { cn } from '@/lib/utils';
 const settingsSchema = z.object({
   sources: z.string().min(10, 'Please provide at least one URL.'),
   articleTopic: z.string().min(5, 'Please provide a topic for the AI to focus on.'),
-  frequency: z.string(),
+  frequencyValue: z.coerce.number().min(1, 'Must be at least 1.'),
+  frequencyUnit: z.enum(['minutes', 'hours']),
   maxPosts: z.coerce.number().min(1, 'Must be at least 1.').max(10, 'Cannot exceed 10.'),
 });
 
@@ -46,8 +47,6 @@ export type SettingsData = z.infer<typeof settingsSchema>;
 
 const defaultSources = [
   'https://huggingface.co/papers',
-  'https://www.reddit.com/r/LocalLLaMA/',
-  'https://www.reddit.com/r/LocalLLM/',
 ].join('\n');
 
 export function SettingsForm() {
@@ -63,7 +62,8 @@ export function SettingsForm() {
     defaultValues: {
       sources: defaultSources,
       articleTopic: 'running small LLMs on limited resources',
-      frequency: '4',
+      frequencyValue: 4,
+      frequencyUnit: 'hours',
       maxPosts: 3,
     },
   });
@@ -123,13 +123,18 @@ export function SettingsForm() {
     addLogMessage('Starting AI Pipeline...');
 
     let totalArticlesAdded = 0;
+    const logForDb: string[] = [];
+    const addDbLog = (msg: string) => {
+        addLogMessage(msg);
+        logForDb.push(msg);
+    }
 
     try {
       const { sources, maxPosts, articleTopic } = form.getValues();
       const sourceUrls = sources.split('\n').filter(s => s.trim() !== '');
       
       if (sourceUrls.length === 0) {
-        addLogMessage('ERROR: No source URLs provided.');
+        addDbLog('ERROR: No source URLs provided.');
         toast({
           title: 'Error',
           description: 'Please provide at least one source URL.',
@@ -141,50 +146,50 @@ export function SettingsForm() {
 
       for (const sourceUrl of sourceUrls) {
         if (totalArticlesAdded >= maxPosts) {
-            addLogMessage(`Maximum post limit (${maxPosts}) reached. Stopping pipeline.`);
+            addDbLog(`Maximum post limit (${maxPosts}) reached. Stopping pipeline.`);
             break;
         }
 
         try {
-            addLogMessage(`Searching for articles in: ${sourceUrl}`);
+            addDbLog(`Searching for articles in: ${sourceUrl}`);
             const result = await runArticlePipeline({ sourceUrl, articleTopic });
             
             if (result.message.startsWith('ERROR')) {
-                addLogMessage(`ERROR processing ${sourceUrl}: ${result.message.replace('ERROR: ', '')}`);
+                addDbLog(`ERROR processing ${sourceUrl}: ${result.message.replace('ERROR: ', '')}`);
                 continue;
             }
 
             if (!result.processedArticles || result.processedArticles.length === 0) {
-              addLogMessage(result.message || `No new articles processed from ${sourceUrl}.`);
+              addDbLog(result.message || `No new articles processed from ${sourceUrl}.`);
               continue; // Try next source
             }
             
-            addLogMessage(`Found and processed ${result.processedArticles.length} articles from ${sourceUrl}.`);
+            addDbLog(`Found and processed ${result.processedArticles.length} articles from ${sourceUrl}.`);
             
             for (const article of result.processedArticles) {
                 if (totalArticlesAdded >= maxPosts) break;
                 try {
-                    addLogMessage(`Saving to database: ${article.title}`);
+                    addDbLog(`Saving to database: ${article.title}`);
                     await addArticle({
                       ...article,
                       featuredImage: article.featuredImage || '',
                     });
-                    addLogMessage(`Successfully saved: ${article.title}`);
+                    addDbLog(`Successfully saved: ${article.title}`);
                     totalArticlesAdded++;
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : String(error);
-                    addLogMessage(`ERROR saving article "${article.title}": ${errorMessage}`);
+                    addDbLog(`ERROR saving article "${article.title}": ${errorMessage}`);
                 }
             }
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            addLogMessage(`ERROR processing source ${sourceUrl}: ${errorMessage}`);
+            addDbLog(`ERROR processing source ${sourceUrl}: ${errorMessage}`);
             continue; // Continue to the next source even if one fails
         }
       }
       
-      addLogMessage(`Pipeline complete. Added ${totalArticlesAdded} new articles.`);
+      addDbLog(`Pipeline complete. Added ${totalArticlesAdded} new articles.`);
       toast({
         title: 'Pipeline Complete!',
         description: `${totalArticlesAdded} new articles were processed. Check the log for details.`,
@@ -192,21 +197,25 @@ export function SettingsForm() {
       });
 
       if (totalArticlesAdded > 0) {
-        addLogMessage('Refreshing page data...');
+        addDbLog('Refreshing page data...');
         router.refresh();
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      addLogMessage(`PIPELINE FAILED: ${errorMessage}`);
+      addDbLog(`PIPELINE FAILED: ${errorMessage}`);
       toast({
         title: 'Pipeline Failed',
         description: 'An unexpected error occurred. Check the log for details.',
         variant: 'destructive',
       });
     } finally {
-      setIsProcessing(false);
       addLogMessage('Process finished.');
+      logForDb.push('Process finished.');
+      const status = logForDb.some(l => l.includes('ERROR')) ? (totalArticlesAdded > 0 ? 'Partial Success' : 'Failure') : 'Success';
+      await addPipelineRunLog({ log: logForDb, articlesAdded: totalArticlesAdded, status });
+      setIsProcessing(false);
+      router.refresh(); // Refresh to show new logs
     }
   };
 
@@ -241,9 +250,12 @@ export function SettingsForm() {
                             <div className="h-10 w-full animate-pulse rounded-md bg-muted"></div>
                         </div>
                         <div className="grid gap-6 sm:grid-cols-2">
-                            <div className="space-y-2">
+                             <div className="space-y-2">
                                 <FormLabel>Scraping Frequency</FormLabel>
-                                <div className="h-10 w-full animate-pulse rounded-md bg-muted"></div>
+                                <div className="flex gap-2">
+                                    <div className="h-10 w-1/2 animate-pulse rounded-md bg-muted"></div>
+                                    <div className="h-10 w-1/2 animate-pulse rounded-md bg-muted"></div>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <FormLabel>Max Posts per Run</FormLabel>
@@ -295,30 +307,47 @@ export function SettingsForm() {
                             )}
                         />
                         <div className="grid gap-6 sm:grid-cols-2">
-                        <FormField
-                            control={form.control}
-                            name="frequency"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Scraping Frequency</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                    <SelectValue placeholder="Select frequency" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="1">Once daily</SelectItem>
-                                    <SelectItem value="2">Twice daily</SelectItem>
-                                    <SelectItem value="4">4 times daily</SelectItem>
-                                    <SelectItem value="8">8 times daily</SelectItem>
-                                </SelectContent>
-                                </Select>
-                                <FormDescription>How often to check for new articles.</FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
+                         <div className="space-y-2">
+                            <FormLabel>Scraping Frequency</FormLabel>
+                            <div className="flex items-center gap-2">
+                                <FormField
+                                    control={form.control}
+                                    name="frequencyValue"
+                                    render={({ field }) => (
+                                        <FormItem className="w-1/2">
+                                            <FormControl>
+                                                <Input type="number" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="frequencyUnit"
+                                    render={({ field }) => (
+                                        <FormItem className="w-1/2">
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Unit" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="minutes">Minutes</SelectItem>
+                                                    <SelectItem value="hours">Hours</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                             <FormDescription className="mt-2">
+                                How often to automatically check for new articles.
+                            </FormDescription>
+                         </div>
+
                         <FormField
                             control={form.control}
                             name="maxPosts"

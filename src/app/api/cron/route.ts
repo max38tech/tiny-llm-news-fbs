@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { runArticlePipeline } from '@/ai/flows/run-article-pipeline';
-import { addArticle } from '@/lib/firebase/service';
+import { addArticle, addPipelineRunLog } from '@/lib/firebase/service';
 import { getSettings } from '@/lib/firebase/service';
 
 // This is the endpoint that will be called by your cron job service.
@@ -14,14 +14,21 @@ export async function GET(request: Request) {
     });
   }
 
-  console.log('Cron job started...');
+  const log: string[] = [];
+  const addLog = (message: string) => {
+      console.log(message);
+      log.push(`[${new Date().toLocaleTimeString()}] ${message}`);
+  }
+
+  addLog('Cron job started...');
   let articlesAdded = 0;
 
   try {
     const settings = await getSettings();
     
     if (!settings) {
-        console.log('No settings found. Skipping pipeline.');
+        addLog('No settings found. Skipping pipeline.');
+        await addPipelineRunLog({ log, articlesAdded: 0, status: 'Failure' });
         return NextResponse.json({ success: true, message: 'No settings found.' });
     }
 
@@ -31,20 +38,20 @@ export async function GET(request: Request) {
 
     for (const sourceUrl of sources) {
         if (articlesAdded >= maxPosts) {
-            console.log(`Max posts limit (${maxPosts}) reached.`);
+            addLog(`Max posts limit (${maxPosts}) reached.`);
             break;
         }
 
-        console.log(`Processing source: ${sourceUrl}`);
+        addLog(`Processing source: ${sourceUrl}`);
         const pipelineResult = await runArticlePipeline({ sourceUrl, articleTopic });
 
         if (pipelineResult.message.startsWith('ERROR')) {
-            console.error(`Error processing source ${sourceUrl}: ${pipelineResult.message}`);
+            addLog(`Error processing source ${sourceUrl}: ${pipelineResult.message}`);
             continue;
         }
 
         if (!pipelineResult.processedArticles || pipelineResult.processedArticles.length === 0) {
-            console.log(`No articles processed for ${sourceUrl}.`);
+            addLog(`No articles processed for ${sourceUrl}.`);
             continue;
         }
 
@@ -52,28 +59,31 @@ export async function GET(request: Request) {
             if (articlesAdded >= maxPosts) break;
             
             try {
-                console.log(`Saving to database: ${processedArticle.title}`);
+                addLog(`Saving to database: ${processedArticle.title}`);
                 await addArticle({
                     ...processedArticle,
                     featuredImage: processedArticle.featuredImage || '',
                 });
                 
                 articlesAdded++;
-                console.log(`Successfully saved: ${processedArticle.title}`);
+                addLog(`Successfully saved: ${processedArticle.title}`);
 
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                console.error(`Error processing article ${processedArticle.originalArticleUrl}:`, errorMessage);
+                addLog(`Error processing article ${processedArticle.originalArticleUrl}: ${errorMessage}`);
             }
         }
     }
 
-    console.log(`Cron job finished. Added ${articlesAdded} new articles.`);
+    addLog(`Cron job finished. Added ${articlesAdded} new articles.`);
+    const status = log.some(l => l.includes('Error')) ? (articlesAdded > 0 ? 'Partial Success' : 'Failure') : 'Success';
+    await addPipelineRunLog({ log, articlesAdded, status });
     return NextResponse.json({ success: true, articlesAdded });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('Cron job failed:', errorMessage);
+    addLog(`Cron job failed: ${errorMessage}`);
+    await addPipelineRunLog({ log, articlesAdded: 0, status: 'Failure' });
     return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
