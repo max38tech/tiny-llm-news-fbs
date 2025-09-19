@@ -39,7 +39,9 @@ const prompt = ai.definePrompt({
   Your task is to summarize the following article content, focusing specifically on information related to "{{articleTopic}}".
   The summary should be detailed and take an average reader about 1 minute to read (around 200-250 words). Provide a suitable title for the article that reflects this focus.
   
-  Return the original article URL and a featured image if one is available in the content.
+  From the provided content, identify the most prominent image URL to use as a featured image. The URL must be a direct link to an image file (e.g., .jpg, .png, .webp). Do not select icons or logos. If no suitable image is found, do not include the featuredImage field.
+
+  Return the original article URL.
 
   Article Content: {{{articleContent}}}
   Original Article URL: {{{articleUrl}}}

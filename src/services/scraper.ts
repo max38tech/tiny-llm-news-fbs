@@ -1,4 +1,3 @@
-
 'use server';
 
 import { JSDOM } from 'jsdom';
@@ -19,10 +18,17 @@ export async function scrapeUrl(url: string): Promise<string> {
         const dom = new JSDOM(html, { url });
         const { document } = dom.window;
 
+        // Remove script and style elements to clean up the text
+        document.querySelectorAll('script, style').forEach(elem => elem.remove());
+        
+        // Get all links
         const links = Array.from(document.querySelectorAll('a'));
         
         if (links.length === 0) {
-            return 'SCRAPE_ERROR: No links found on the page.';
+            // If no links, return the body text as a fallback
+            const bodyText = document.body.textContent || '';
+            if (bodyText.trim()) return bodyText;
+            return 'SCRAPE_ERROR: No links or text content found on the page.';
         }
 
         const linkData = links
@@ -42,5 +48,3 @@ export async function scrapeUrl(url: string): Promise<string> {
         return `SCRAPE_ERROR: ${errorMessage}`;
     }
 }
-
-    

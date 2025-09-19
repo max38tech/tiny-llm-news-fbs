@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server';
 import { runArticlePipeline } from '@/ai/flows/run-article-pipeline';
 import { summarizeArticle } from '@/ai/flows/summarize-articles';
-import { generateArticleImage } from '@/ai/flows/generate-article-image';
 import { addArticle } from '@/lib/firebase/service';
 import { getSettings } from '@/lib/firebase/service';
 
@@ -40,6 +39,11 @@ export async function GET(request: Request) {
         console.log(`Processing source: ${sourceUrl}`);
         const pipelineResult = await runArticlePipeline({ sourceUrl });
 
+        if (pipelineResult.message.startsWith('ERROR')) {
+            console.error(`Error processing source ${sourceUrl}: ${pipelineResult.message}`);
+            continue;
+        }
+
         if (!pipelineResult.foundArticles || pipelineResult.foundArticles.length === 0) {
             console.log(`No articles found for ${sourceUrl}.`);
             continue;
@@ -55,13 +59,8 @@ export async function GET(request: Request) {
                     articleTopic: articleTopic,
                 });
 
-                let finalImage = summaryOutput.featuredImage;
-
-                if (!finalImage) {
-                    console.log(`Generating image for: ${summaryOutput.title}`);
-                    const imageOutput = await generateArticleImage({ articleDescription: `${summaryOutput.title} - ${summaryOutput.summary}` });
-                    finalImage = imageOutput.imageUrl;
-                }
+                // Image generation is disabled to avoid oversized documents.
+                const finalImage = summaryOutput.featuredImage || '';
 
                 console.log(`Saving to database: ${summaryOutput.title}`);
                 await addArticle({

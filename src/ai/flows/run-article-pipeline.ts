@@ -54,25 +54,23 @@ const articlePipelineFlow = ai.defineFlow(
     outputSchema: ArticlePipelineOutputSchema,
   },
   async (input) => {
-    // 1. Scrape the source URL to get a list of links
-    const linkData = await scrapeUrl(input.sourceUrl);
+    // 1. Scrape the source URL to get its content (either links or body text)
+    const scrapedContent = await scrapeUrl(input.sourceUrl);
     
-    if (linkData.startsWith('SCRAPE_ERROR:')) {
-        return { message: linkData, foundArticles: [] };
+    if (scrapedContent.startsWith('SCRAPE_ERROR:')) {
+        return { message: scrapedContent, foundArticles: [] };
     }
 
-    if (!linkData) {
+    if (!scrapedContent) {
         return { message: 'Could not retrieve content from the source URL.', foundArticles: [] };
     }
-
-    // The AI can sometimes return conversational text or markdown with the JSON.
-    // We will try to extract the JSON object from the response string.
-    const rawOutput = (await findArticleLinksPrompt({ linkData, sourceUrl: input.sourceUrl })).output;
-
+    
+    // The scrape might return links or just text. The prompt can handle either.
+    const { output } = await findArticleLinksPrompt({ linkData: scrapedContent, sourceUrl: input.sourceUrl });
+    
     let articlesOutput;
-
-    if (typeof rawOutput === 'string') {
-        const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
+     if (typeof output === 'string') {
+        const jsonMatch = output.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             try {
                 articlesOutput = ArticleLinksSchema.parse(JSON.parse(jsonMatch[0]));
@@ -82,8 +80,7 @@ const articlePipelineFlow = ai.defineFlow(
             }
         }
     } else {
-        // If it's already an object, just parse it.
-        articlesOutput = ArticleLinksSchema.parse(rawOutput);
+        articlesOutput = ArticleLinksSchema.parse(output);
     }
     
 

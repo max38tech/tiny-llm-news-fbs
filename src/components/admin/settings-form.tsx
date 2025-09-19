@@ -129,11 +129,12 @@ export function SettingsForm() {
 
         let finalImage = summaryOutput.featuredImage;
 
-        if (!finalImage) {
-            addLogMessage(`Generating image for: ${article.title}`);
-            const imageOutput = await generateArticleImage({ articleDescription: `${summaryOutput.title} - ${summaryOutput.summary}` });
-            finalImage = imageOutput.imageUrl;
-        }
+        // We no longer generate images to avoid file size issues.
+        // if (!finalImage) {
+        //     addLogMessage(`Generating image for: ${article.title}`);
+        //     const imageOutput = await generateArticleImage({ articleDescription: `${summaryOutput.title} - ${summaryOutput.summary}` });
+        //     finalImage = imageOutput.imageUrl;
+        // }
         
         addLogMessage(`Saving to database: ${article.title}`);
         await addArticle({
@@ -179,11 +180,11 @@ export function SettingsForm() {
         }
 
         try {
-            addLogMessage(`Scraping source: ${sourceUrl}`);
+            addLogMessage(`Searching for articles in: ${sourceUrl}`);
             const result = await runArticlePipeline({ sourceUrl });
             
-            if (result.message.startsWith('SCRAPE_ERROR:')) {
-                addLogMessage(`ERROR scraping ${sourceUrl}: ${result.message.replace('SCRAPE_ERROR: ', '')}`);
+            if (result.message.startsWith('ERROR')) {
+                addLogMessage(`ERROR processing ${sourceUrl}: ${result.message.replace('ERROR: ', '')}`);
                 continue;
             }
 
