@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, provider, signInWithRedirect } from '@/lib/firebase';
+import { auth, provider, signInWithPopup } from '@/lib/firebase';
 import { Button } from './ui/button';
 import { LogIn, LogOut } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
@@ -26,7 +26,8 @@ export function AuthButton() {
 
   const handleSignIn = async () => {
     try {
-      await signInWithRedirect(auth, provider);
+      await signInWithPopup(auth, provider);
+      router.push('/admin');
     } catch (error: any) {
       console.error('Error signing in with Google: ', error);
       toast({
