@@ -1,8 +1,9 @@
+
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import type { Article } from '@/lib/articles';
-import { getArticles } from '@/lib/articles';
+import { getArticles } from '@/lib/firebase/service';
 import { ArticleCard } from '@/components/article-card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 
 const ARTICLES_PER_PAGE = 9;
 
-export default function Home() {
+function HomeContent() {
   const [allArticles, setAllArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [readArticles, setReadArticles] = useState<Set<string>>(new Set());
@@ -26,7 +27,7 @@ export default function Home() {
     const fetchArticles = async () => {
       setIsLoading(true);
       try {
-        const articles = await getArticles(100); // Fetch more articles for searching
+        const articles = await getArticles(); 
         setAllArticles(articles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       } catch (error) {
         console.error("Failed to fetch articles:", error);
@@ -79,7 +80,95 @@ export default function Home() {
   }, [filteredArticles, currentPage]);
 
   const totalPages = Math.ceil(filteredArticles.length / ARTICLES_PER_PAGE);
+  
+  if (isLoading) {
+    return (
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="space-y-4">
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+            </div>
+        ))}
+        </div>
+    );
+  }
 
+  return (
+    <>
+      <div className="mb-8 max-w-md">
+        <Input
+          type="text"
+          placeholder="Search articles..."
+          value={searchQuery}
+          onChange={handleSearchChange}
+          className="w-full"
+        />
+      </div>
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        {paginatedArticles.map((article) => (
+          <ArticleCard key={article.id} article={article} onMarkAsRead={handleMarkAsRead} />
+        ))}
+      </div>
+
+      {filteredArticles.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground">
+            <h2 className="text-2xl font-semibold">No Articles Found</h2>
+            <p>Try adjusting your search or check back later.</p>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-8 flex justify-center items-center gap-4">
+          <Button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+            variant="outline"
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            variant="outline"
+          >
+            Next
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+
+function LoadingSkeleton() {
+    return (
+        <div>
+            <div className="mb-8 max-w-md">
+                <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="space-y-4 rounded-lg border p-6">
+                    <Skeleton className="h-6 w-3/4" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-5/6" />
+                    </div>
+                     <Skeleton className="h-5 w-24" />
+                </div>
+            ))}
+            </div>
+        </div>
+    )
+}
+
+export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 p-4 md:p-8">
@@ -92,65 +181,9 @@ export default function Home() {
               AI-curated digest on running small Language Models on local machines.
             </p>
           </header>
-
-          <div className="mb-8 max-w-md">
-            <Input
-              type="text"
-              placeholder="Search articles..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full"
-            />
-          </div>
-
-          {isLoading ? (
-             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 9 }).map((_, i) => (
-                    <div key={i} className="space-y-4">
-                        <Skeleton className="h-8 w-3/4" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-5/6" />
-                    </div>
-                ))}
-            </div>
-          ) : (
-            <>
-              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                {paginatedArticles.map((article) => (
-                  <ArticleCard key={article.id} article={article} onMarkAsRead={handleMarkAsRead} />
-                ))}
-              </div>
-
-              {filteredArticles.length === 0 && (
-                <div className="text-center py-16 text-muted-foreground">
-                    <h2 className="text-2xl font-semibold">No Articles Found</h2>
-                    <p>Try adjusting your search or check back later.</p>
-                </div>
-              )}
-
-              {totalPages > 1 && (
-                <div className="mt-8 flex justify-center items-center gap-4">
-                  <Button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage <= 1}
-                    variant="outline"
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage >= totalPages}
-                    variant="outline"
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
+          <Suspense fallback={<LoadingSkeleton />}>
+            <HomeContent />
+          </Suspense>
         </div>
       </main>
     </div>
